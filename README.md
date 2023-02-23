@@ -8,3 +8,4 @@ The second method, based on interaction, can be used if you're not limited by th
 
 ![image](https://user-images.githubusercontent.com/114993027/220967873-c8a4edaa-2d93-441c-b88e-7ec0a9bb674b.png)
 
+This work was supported by funding from the European Union’s Horizon 2020 Research and Innovation programme under grant agreement No 773830: One Health European Joint Programme (project CARE: Cross-sectoral framework for quality Assurance Resources for countries in the European Union)
