@@ -9,7 +9,7 @@ All commands that you use to use when developing packages...
 
 # First time just after creating the project
 
-- Fill the following chunk to create the DESCRIPTION of your package
+-   Fill the following chunk to create the DESCRIPTION of your package
 
 ```{r description, eval=FALSE}
 # Describe your package
@@ -53,8 +53,8 @@ usethis::use_news_md()
 
 **From now, you will need to "inflate" your package at least once to be able to use the following commands. Let's go to your flat template, and come back here later if/when needed.**
 
-
 # Package development tools
+
 ## Use once
 
 ```{r, eval=FALSE}
@@ -105,4 +105,3 @@ pkgdown::build_site()
 # build the tar.gz with vignettes to share with others
 devtools::build(vignettes = TRUE)
 ```
-
