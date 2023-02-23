@@ -1,0 +1,60 @@
+---
+title: "strainselect_example"
+author: "Marie Vallée"
+date: "2023-02-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Examples of the application of the strainselect package
+
+this vignette will show you some examples of how to use the strainselect package using a single dataset with a variety of specific cases.
+
+the dataset contains the characteristics of 300 salmonella strains distributed over 24 variables .
+
+```{r}
+raw_data <- read.csv("data_ex_300.csv",sep=";")
+raw_data
+```
+
+For these examples, we want to focus the selection on 6 variables : CONTEXTE, MATRICE1, REGION, SECTEUR, LIEUPVT and ANNEE. The first thing we do is use the prepare_input function to keep only the metadata on which you want to base your selection.
+
+```{r}
+prepared_data <- strainselect::prepare_input(raw_data,col_select=c(7,10,13,14,17,24),id=1, date=17, m=F, a=T)
+prepared_data
+```
+
+If you have a duplicate Strain ID in your data set, the following error message will be displayed and the data preparation process will not be successful.
+
+![](images/paste-F7494EEA.png){width="455"}
+
+Depending on the number of strains you can sequence, two selection methods are possible.
+
+If you have no restrictions on the number of strains to be sequenced, you should use the interaction method. This method allows you to select all the different strain profiles.
+
+The prepare_upset function first converts the prepared_data data frame into a binary matrix and then you can visualize the interactions in an upset graph.
+
+```{r}
+upset_data <- strainselect::prepare_upset(prepared_data)
+upset_data
+UpSetR::upset(upset_data,nset = 70, order.by = "freq", mb.ratio = c(0.30,0.70),set_size.show = T, nintersects = NA)
+```
+
+This graph shows all groups containing identical strains and their characteristics.
+
+The define_profile function is then used for the identification of these groups.
+
+```{r}
+upset_profiles <- strainselect::define_profiles(upset_data)
+upset_profiles
+```
+
+Finally, the select_profiles function is used to randomly select one strain per group that will be sequenced.
+
+```{r}
+strain_select_profiles <- strainselect::select_profiles(upset_profiles, prepared_data)
+strain_select_profiles
+```

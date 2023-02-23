@@ -2,7 +2,9 @@
 
 export(assess_gower)
 export(cstats_table)
-export(my_median)
-export(my_other_median)
+export(define_profiles)
 export(prepare_input)
 export(prepare_upset)
+export(select_profiles)
+export(select_silhouette)
+importFrom(cluster,daisy)

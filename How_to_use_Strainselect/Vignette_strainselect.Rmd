@@ -1,0 +1,79 @@
+---
+title: "Vignette_strainselect"
+author: "Marie Vallée"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Strain_select package
+
+This package offers two methods for selecting strains to be sequenced. The first one based on clustering method can be use if you are limited on the number of strain to sequence. It allows choosing the optimal number of cluster or fix the number of cluster you can sequence. Clusters are defined thanks to a dissimilarity matrix that results from the calculation of the gower distance between each strain. Then the strain which is the best clustered is choose for each cluster. This method allows the selections of strains that differ in their characteristics.
+
+The second method based on interaction can be use if you are not limited on the number of strain to sequence. It groups the strains according to their interactions. For this method, strains that are very similar are grouped while identifying unique strains that are not similar to any other.
+
+## First step: Cleaning data
+
+Before using any of these methods, the dataset must be clean and contain only the metadata on which you want to base your selection.
+
+The function prepare_input function allows to create a clean data frame from a data frame containing a number of metadata. The user can choose the column corresponding to the ID strains in order to name the rows of the data frame. He also can select the number of the metadata columns to include in the clean data frame. If a date column is selected, the user can choose to keep the year, month or both information. To create the clean data frame, the function first checks that there is no duplicate. If there are duplicate, an error message appears with the identified duplicate ID and the clean data frame cannot be created. Otherwise the message "no duplicate ID" appears and the data frame is created. The names of the metadata of the new data frame are recalled in order to verify that the correct columns were selected initially.
+
+## Clustering method
+
+The clustering method uses three functions to result to a list of selected strain: asses_gower, cstats_table and select_silhouette. The use of cstats_table function is optional if you have a fixed number of strains to sequence.
+
+### assess_gower function
+
+The assess_gower function calculate a gower distance matrix from the clean data frame resulting from the prepare_data function.
+
+The user can choose to add weights to metadata to adjust the clustering.
+
+The assess_gower function then perform a hierarchical cluster analysis on the distance matrix with a "complete" agglomeration method. The dendrogram resulting from the hierarchical cluster analysis is displayed if graph=True in the function input.
+
+### cstats_table function
+
+cstat_table function create a data frame including Cluster stats. The avg.silwidth is the data we are most interest in because it will be used to determine the optimal number of cluster to choose if necessary.
+
+The user enters a distance object and a dendogram object resulting from the function assess_gower. He can choose the number of cluster to test and a step to improve the execution time of the function. The idea is to test a large number of cluster but without exceeding the number of strain you can sequence.
+
+Using the output data frame, the silhouette is drawn to determine the optimal number of clusters. This optimum is marked by the presence of a maximum or a plateau on the curve.
+
+*(Example graph)*
+
+### select_silhouette function
+
+The final step of this method is to select the perfect strain to sequence for each cluster. The select_silhouette function is used for this purpose.
+
+This function uses the distance object resulting from assess_gower function and a number of cluster k determined with the silhouette plot or given by the user if he has a fixed number of strain to sequence.
+
+For each cluster, the function identify the strain with the maximum silhouette, which means that it is the best clustered. If there are multiple strains with maximum silhouette for the same cluster, the function randomly choose between the concerned strains.
+
+This function return a data frame with for each strain, its characteristics, its cluster, the corresponding cluster size and the strain selected for its cluster.
+
+## Interaction-based method
+
+This method allows to group strains that are strictly identical according to all the selected metadata. This method uses three functions to select the strains to sequence: prepare_upset, define_profiles and select_profiles.
+
+Unlike the clustering method, this method create groups in which all strains are identical.
+
+### prepare_upset function
+
+This function create a binary matrix from the data frame resulting from the prepare_data function. It uses each modality of all metadata as column names and fills the rows with 1 if the strain is concerned by the modality and 0 otherwise
+
+This matrix is then used to visualize the interaction groups using the function upset() of the UpsetR package.
+
+*(Example graph)*
+
+### define_profiles function
+
+This function creates a new data frame with a column that identifies the interaction-based group for each strain. It creates a profile by strain by concatenating the columns of the matrix resulting from the prepare_upset function. All profiles are then compared and the identical profiles are placed in a same group and a single profile corresponds to a group containing a single strain.
+
+### Select_profiles function
+
+Finally, the select_profiles function select a strain per group.
+
+When a group contains a single strain, this strain is automatically selected. Since strains are identical in groups with multiples strains, in this case, the function randomly choose a strain for each of theses groups.
+
+This function return a data frame with for each strain, its characteristics, its group, the corresponding group size and the strain selected for its group.

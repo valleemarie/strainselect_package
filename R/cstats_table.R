@@ -6,6 +6,7 @@
 #' @param tree a dendrogram object
 #' @param k a number
 #' @param l a number
+#' @param graph_silhouette a boolean
 #'
 #' @return a dataframe
 #' @export
@@ -14,18 +15,18 @@
 #' # Example with your dataset in "inst/"
 #' datafile <- system.file("data_test.csv", package = "strainselect")
 #' raw_data <- read.csv(datafile, sep = ";",header = T)
-#' gower <- assess_gower(raw_data)
+#' gower <- assess_gower(prepared_data, graph = T)
 #' # Apply my function
 #' cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c, k = 50,l = 10)
- cstats_table <- function(dist, tree, k,l) {
-   n = k/l
+cstats_table <- function(dist, tree, k,l, graph_silhouette =T) {
+   n=k/l
    clust.assess <- c("cluster.number","n","within.cluster.ss","average.within","average.between",
                      "wb.ratio","dunn2","avg.silwidth")
    clust.size <- c("cluster.size")
    stats.names <- c()
    row.clust <- c()
    output.stats <- matrix(ncol = n, nrow = length(clust.assess))
-   cluster.sizes <- matrix(ncol = n, nrow = n)
+   cluster.sizes <- matrix(ncol =n, nrow = n)
    for(i in 1:n){
        row.clust[i] <- paste("Cluster-", i*l, " size")
    }
@@ -42,7 +43,6 @@
        cluster.sizes[d, i] <- unlist(cluster.stats(d = dist, clustering = cutree(tree, k = i*l))[clust.size])[d*l]
        dim(cluster.sizes[d, i]) <- c(length(cluster.sizes[i]), 1)
        cluster.sizes[d, i]
-       
      }
    }
    output.stats.df <- data.frame(output.stats)
@@ -55,5 +55,14 @@
    rownames(output) <- rows.all
    is.num <- sapply(output, is.numeric)
    output[is.num] <- lapply(output[is.num], round, 2)
-   output
+   data_fig <- data.frame(t(output))
+   if (graph_silhouette){
+     ggplot(data = data_fig, 
+            aes(x=cluster.number, y=avg.silwidth)) + 
+       geom_point()+
+       geom_line()+
+       ggtitle("Agglomerative clustering") +
+       labs(x = "Num.of clusters", y = "Average silhouette width") +
+       theme(plot.title = element_text(hjust = 0.5)) 
+   }
  }

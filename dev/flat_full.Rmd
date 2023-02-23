@@ -1,4 +1,5 @@
 ---
+!---
 title: "flat_full.Rmd for working package"
 output: html_document
 editor_options: 
@@ -10,191 +11,438 @@ editor_options:
 <!-- Store every call to library() that you need to explore your functions -->
 
 ```{r development, include=FALSE}
+library(cluster) 
+library(fpc)
+library(ggplot2)
+library(dplyr)
+library(dendextend)
+library(UpSetR)
+library(nomclust)
+library(factoextra)
+library(tidyr)
 library(testthat)
 ```
 
-```{=html}
-<!--
- You need to run the 'description' chunk in the '0-dev_history.Rmd' file before continuing your code there.
-
-If it is the first time you use {fusen}, after 'description', you can directly run the last chunk of the present file with inflate() inside.
--->
-```
 ```{r development-load}
 # Load already included functions if relevant
 pkgload::load_all(export_all = FALSE)
 ```
 
-# Include some data examples in your package
+# Data examples
 
 ```{=html}
-<!-- 
- Store your dataset in a directory named "inst/" at the root of your project.
- Use it for your tests in this Rmd thanks to `pkgload::load_all()` to make it available
-and `system.file()` to read it in your examples.
-
-- There already is a dataset in the "inst/" directory to be used in the examples below
--->
 ```
 ```{r development-dataset}
-# Run all this chunk in the console directly
-# There already is a dataset in the "inst/" directory
-# Make the dataset file available to the current Rmd during development
 pkgload::load_all(path = here::here(), export_all = FALSE)
 
-# You will be able to read your example data file in each of your function examples and tests as follows - see chunks below
-datafile <- system.file("nyc_squirrels_sample.csv", package = "strainselect")
-nyc_squirrels <- read.csv(datafile, encoding = "UTF-8")
+datafile <- system.file("data_test.csv", package = "strainselect")
+row_data <- read.csv(datafile, sep = ";",header = T)
 
-nyc_squirrels
+row_data
 ```
 
-# The first function of the package: Calculate the median of a vector
+# prepare_input function
 
 ```{=html}
 <!--
-Create a chunk for the core of the function
-
-- The chunk needs to be named `function` at least
-- It contains the code of a documented function
-- The chunk can also be named `function-my_median` to make it easily
-findable in your Rmd
-- Let the `@examples` part empty, and use the next `examples` chunk instead to present reproducible examples
-
-After inflating the template
-
--  This function code will automatically be added in a new file in the "R/" directory
+Include a data table describing bacterial strains according to a number of metadata.
+The prepare_input function tests if the strain ID are all different and extracts the metadata selected by the user.
+The user can choose to extract the month or the year or both data from the date entered in the initial table.
 -->
 ```
-```{r function}
-#' My median
+```{r function-prepare_input}
+#' prepare_input
 #'
-#' @param x Vector of Numeric values
-#' @inheritParams stats::median
+#' @param data a dataframe
+#' @param col_select a vector
+#' @param id a number
+#' @param date a number
+#' @param m a boolean
+#' @param a a boolean
 #'
-#' @return
-#' Median of vector x
+#' @return a dataframe
 #' @export
-#'
 #' @examples
-my_median <- function(x, na.rm = TRUE) {
-  if (!is.numeric(x)) {stop("x should be numeric")}
-  stats::median(x, na.rm = na.rm)
+prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
+                           m=FALSE, a=TRUE) {
+  duplicate <- which(duplicated(data[,id]))
+  if (length(duplicate)!=0) {
+    stop ( "duplicate ID : " , paste(data[duplicate,id], collapse = ", "))
+  } else {
+    print("no duplicate ID")
+  }
+  rownames(data) <- data[,id]
+  col_select<-col_select[! col_select %in% date]
+  clean_data <- data[,col_select]
+  if (date!=0){
+    if(a){
+      clean_data$ANNEE <- substr(data[,date],7,10)
+    }
+    if(m){
+      clean_data$MOIS <- substr(data[,date],4,5)
+    }
+  }
+  clean_data[is.na(clean_data)] <- "unknown"
+  clean_data[] <- lapply(clean_data, factor)
+  print(colnames(clean_data))
+  str(clean_data)
+  clean_data
 }
 ```
 
-```{=html}
-<!--
-Create a chunk with an example of use for your function
-
-- The chunk needs to be named `examples` at least
-- It contains working examples of your function
-- The chunk is better be named `examples-my_median` to be handled
-correctly when inflated as a vignette
-
-After inflating the template
-
--  This example will automatically be added in the '@examples' part of our function above in the "R/" directory
-- This example will automatically be added in the vignette created from this Rmd template
--->
-```
-```{r examples}
-my_median(1:12)
+```{r examples-prepare_input}
 
 # Example with your dataset in "inst/"
-datafile <- system.file("nyc_squirrels_sample.csv", package = "strainselect")
-nyc_squirrels <- read.csv(datafile, encoding = "UTF-8")
+datafile <- system.file("data_test.csv", package = "strainselect")
+raw_data <- read.csv(datafile, sep = ";",header = T)
 # Apply my function
-my_median(nyc_squirrels[,"hectare_squirrel_number"])
+prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
+              id=1,date=17,m=FALSE,a=TRUE)
 ```
 
-```{=html}
-<!--
-Create a chunk with a test of use for your function
-
-- The chunk needs to be named `tests` at least
-- It contains working tests of your function
-- The chunk is better be named `tests-my_median` to be handled
-correctly when inflated as a vignette
-
-After inflating the template
-
--  This test code will automatically be added in the "tests/testthat/" directory
--->
-```
-```{r tests}
-test_that("my_median works properly and show error if needed", {
-  expect_true(my_median(1:12) == 6.5)
-  expect_error(my_median("text"))
-})
-
-# Test with your dataset in "inst/"
-datafile <- system.file("nyc_squirrels_sample.csv", package = "strainselect")
-nyc_squirrels <- read.csv(datafile, encoding = "UTF-8")
-# Apply test on my function
-test_that("my_median works properly with internal dataset", {
-  expect_equal(my_median(nyc_squirrels[,"hectare_squirrel_number"]), 3)
+```{r tests-prepare_input}
+data_test <- matrix("test",nrow = 3,ncol = 5)
+as.data.frame(data_test)
+test_that("prepare_input works properly and show error if needed", {
+  expect_error(prepare_input(data_test))
 })
 ```
 
-# Calculate the mean of a vector
+# assess_gower function
 
 ```{=html}
 <!--
-There can be other functions, examples and tests in your flat template.
-Each of them will be inflated in a different file, provided that there is a level-1 or level-2 section title to separate from previous functions.
+Include a data table describing bacterial strains according to a number of metadata.
+The assess_gower function runs the prepare_input function on the raw data table.
+Gower distances are calculated from the dataframe returned by the prepare_input function. The user can choose to apply weights on the metadata he wants to weight. 
+A hierarchical cluster analysis is performed using the gower distances and the "complete" method. 
+The dendrogram resulting from the hierarchical cluster analysis is plotted if graph=True.
 -->
 ```
-## Use sub-functions in the same chunk
+```{r function-assess_gower}
+#' assess_gower
+#'
+#' @param clean_data a dataframe
+#' @param weights a vector
+#' @param graph a boolean
+#'
+#' @return a list containing the components clean_data, gower_dist, aggl.clust.c
+#' @export
+#' @importFrom cluster daisy
+#'
+#' @examples
+assess_gower <- function(clean_data, weights = rep.int(1, p), graph = TRUE){
+  p=length(clean_data)
+  gower_dist <- daisy(clean_data, metric = "gower", weights = weights)
+  aggl.clust.c <- hclust(gower_dist, method = "complete")
+  if (graph) {
+    plot(aggl.clust.c,main = "Agglomerative, complete linkages")
+  }
+  return(list(gower_dist=gower_dist, aggl.clust.c=aggl.clust.c))
+}
+```
 
-```{r function-my_other_median}
-#' My Other median
+```{r examples-assess_gower}
+# Example with your dataset in "inst/"
+datafile <- system.file("data_test.csv", package = "strainselect")
+raw_data <- read.csv(datafile, sep = ";",header = T)
+prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
+              id=1,date=17,m=FALSE,a=TRUE)
+# Apply my function
+assess_gower(prepared_data, graph = T)
+```
+
+# cstats_table function
+
+```{=html}
+<!--
+cstat_table create a dataframe including Cluster stats. The avg.silwidth is the data we are most interest in because it will be used to determine the optimal number of cluster to choose if necessary.
+The user enters a distance object and a dendogram object resulting from the function assess_gower. He can choose the number of cluster to test and a step to improve the execution time of the function.
+-->
+```
+```{r function-cstats_table}
+#' cstats_table
 #'
-#' @param x Vector of Numeric values
-#' @inheritParams stats::median
+#' @param dist a distance object 
+#' @param tree a dendrogram object
+#' @param k a number
+#' @param l a number
+#' @param graph_silhouette a boolean
 #'
-#' @return
-#' Median of vector x
+#' @return a dataframe
 #' @export
 #'
 #' @examples
-my_other_median <- function(x, na.rm = TRUE) {
-  if (!is.numeric(x)) {stop("x should be numeric")}
-  sub_median(x, na.rm =na.rm)
-}
-
-#' Core of the median not exported
-#' @param x Vector of Numeric values
-#' @inheritParams stats::median
-sub_median <- function(x, na.rm = TRUE) {
-  stats::median(x, na.rm)
-}
+cstats_table <- function(dist, tree, k,l, graph_silhouette =T) {
+   n=k/l
+   clust.assess <- c("cluster.number","n","within.cluster.ss","average.within","average.between",
+                     "wb.ratio","dunn2","avg.silwidth")
+   clust.size <- c("cluster.size")
+   stats.names <- c()
+   row.clust <- c()
+   output.stats <- matrix(ncol = n, nrow = length(clust.assess))
+   cluster.sizes <- matrix(ncol =n, nrow = n)
+   for(i in 1:n){
+       row.clust[i] <- paste("Cluster-", i*l, " size")
+   }
+    for(i in 1:n){
+     print(i*l)
+     stats.names[i] <- paste("Test", i*l-1)
+     
+     for(j in seq_along(clust.assess)){
+       output.stats[j, i] <- unlist(cluster.stats(d = dist, clustering = cutree(tree, k = i*l))[clust.assess])[j]
+       
+     }
+     
+     for(d in 1:n) {
+       cluster.sizes[d, i] <- unlist(cluster.stats(d = dist, clustering = cutree(tree, k = i*l))[clust.size])[d*l]
+       dim(cluster.sizes[d, i]) <- c(length(cluster.sizes[i]), 1)
+       cluster.sizes[d, i]
+     }
+   }
+   output.stats.df <- data.frame(output.stats)
+   cluster.sizes <- data.frame(cluster.sizes)
+   cluster.sizes[is.na(cluster.sizes)] <- 0
+   rows.all <- c(clust.assess, row.clust)
+   # rownames(output.stats.df) <- clust.assess
+   output <- rbind(output.stats.df, cluster.sizes)
+   colnames(output) <- stats.names[1:n]
+   rownames(output) <- rows.all
+   is.num <- sapply(output, is.numeric)
+   output[is.num] <- lapply(output[is.num], round, 2)
+   data_fig <- data.frame(t(output))
+   if (graph_silhouette){
+     ggplot(data = data_fig, 
+            aes(x=cluster.number, y=avg.silwidth)) + 
+       geom_point()+
+       geom_line()+
+       ggtitle("Agglomerative clustering") +
+       labs(x = "Num.of clusters", y = "Average silhouette width") +
+       theme(plot.title = element_text(hjust = 0.5)) 
+   }
+ }
 ```
 
-```{r examples-my_other_median}
-my_other_median(1:12)
+```{r examples-cstats_table}
+# Example with your dataset in "inst/"
+datafile <- system.file("data_test.csv", package = "strainselect")
+raw_data <- read.csv(datafile, sep = ";",header = T)
+gower <- assess_gower(prepared_data, graph = T)
+# Apply my function
+cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c, k = 50,l = 10)
 ```
 
-```{r tests-my_other_median}
-test_that("my_median works properly and show error if needed", {
-  expect_true(my_other_median(1:12) == 6.5)
-  expect_error(my_other_median("text"))
-})
-```
+# select_silhouette function
 
 ```{=html}
 <!--
-# There can be development actions
+After setting the number of cluster chosen, the select_silhouette function selects the strain for each cluster that has the maximum silhouette, i.e. the one that is the best clustered.
+If there are multiple strains with a maximum silhouette for the same cluster a random selection is made between the strains concerned.
 
-Create a chunk with 'development' actions
-
-- The chunk needs to be named `development` or `dev`
-- It contains functions that are used for package development only
-- Note that you may want to store most of these functions in the 0-dev_history.Rmd file
-
-These are only included in the present flat template file, their content will not be part of the package anywhere else.
+This function return a data frame with for each strain, its characteristics, its cluster, the corresponding cluster size and the strain selected for its cluster.
 -->
 ```
+```{r function-select_silhouette}
+#' select_silhouette
+#'
+#' @param prepared_data a data frame
+#' @param dist a distance object
+#' @param k a integer
+#' @param isdiss logical value specifying wether x is a dissimilarity matrix
+#' @param hc_func the hierarchical clustering function to be used
+#' @param hc_method he agglomeration method to be used
+#'
+#' @return a data frame
+#' @export
+#'
+#' @examples
+ select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(gower$gower_dist, "dist"),
+                               hc_func = "hclust", hc_method = "complete") {
+   clust2 <- hcut(dist, k, isdiss,hc_func, hc_method)
+   silh <- fviz_silhouette(clust2)
+   selected_data <- prepared_data
+   selected_data$cluster <- clust2$cluster
+   n=nrow(selected_data)
+   selection <- rep(NA,k)
+   for(i in 1:k){
+     max_silh_i <- silh$data[which(silh$data$sil_width==max(silh$data$sil_width[silh$data$cluster==i])&silh$data$cluster==i),]
+     if (nrow(max_silh_i)==1){
+       selection[i] <- as.character(max_silh_i$name)
+     } else {
+       selection[i] <- as.character(sample(max_silh_i$name,1))
+     } 
+   }
+   for (i in 1:n){
+     for (j in 1:k){
+       if (selected_data$cluster[i]==j){
+         selected_data$size[i] <- clust2$size[j]
+         selected_data$selected[i] <- selection[j]
+         
+       }
+     }
+   }
+   selected_data
+ }
+```
+
+```{r examples-select_silhouette}
+datafile <- system.file("data_test.csv", package = "strainselect")
+raw_data <- read.csv(datafile, sep = ";",header = T)
+gower <- assess_gower(prepared_data, graph = T)
+prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
+              id=1,date=17,m=FALSE,a=TRUE)
+
+ select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, isdiss = inherits(gower$gower_dist, "dist"),hc_func = "hclust", hc_method = "complete")
+```
+
+# prepare_upset function
+
+```{=html}
+<!--
+The prepare_upset allows to prepare the dataframe used to visualize the interactions. it uses the modalities of the different variables of prepared_data dataframe as columns and fills the rows with 1 if the strain is concerned by the modality and 0 otherwise.
+-->
+```
+```{r function-prepare_upset}
+#' prepare_upset
+#'
+#' @param prepared_data a dataframe
+#'
+#' @return a dataframe
+#' @export
+#'
+#' @examples
+prepare_upset<- function(prepared_data){
+ upset_data <- data.frame(row.names = rownames(prepared_data))
+ metadata <- colnames(prepared_data)
+ for (i in 1:ncol(prepared_data)){
+   vect <- unique(prepared_data[,i])
+   tab <- matrix(0,nrow(prepared_data),length(vect))
+   col.names <- NULL
+   for (j in 1:length(vect)){
+     col.names <- c(col.names,paste(metadata[i],"_",vect[j]))
+     for (k in 1:nrow(prepared_data)){
+       if (is.na(prepared_data[k,i])==F){
+         if(prepared_data[k,i]==vect[j]){
+           tab[k,j] <- 1
+         }
+       }
+     }
+   }
+   colnames(tab) <- col.names
+   upset_data <- cbind(upset_data,tab)
+ } 
+ upset_data
+}
+
+```
+
+```{r examples-prepare_upset}
+# Example with your dataset in "inst/"
+datafile <- system.file("data_test.csv", package = "strainselect")
+raw_data <- read.csv(datafile, sep = ";",header = T)
+prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
+              id=1,date=17,m=FALSE,a=TRUE)
+# Apply my function
+prepare_upset(prepared_data)
+```
+
+# define_profile function
+
+```{=html}
+<!--
+This function uses the output of pepare_upset function to create a new data frame with a column "profiles" resulting  from the concatenation of the columns of the input data frame and a colonne that identify the group of the strain. 
+Strain are grouped by identical profiles which allows to consider also the strains with a unique profile.
+-->
+```
+```{r function-define_profiles}
+#' define_profiles
+#'
+#' @param data a data frame
+#' @param sep  Separator to use between values
+#'
+#' @return a data frame
+#' @export
+#'
+#' @examples
+define_profiles <- function (data, sep = ""){
+  profiles <- unite(data,profiles,c(1:ncol(upset_data)), sep = sep)
+  profiles_freq <- as.data.frame(table(profiles))
+  profiles_freq$group <- c(1:nrow(profiles_freq))
+  n=nrow(profiles)
+  for (i in 1:n){
+    for (j in 1:nrow(profiles_freq)){
+      if (profiles$profiles[i]==profiles_freq$profiles[j]){
+        profiles$group[i]<-profiles_freq$group[j]
+      }
+    }
+  }
+  profiles$names<-rownames(profiles)
+  
+  profiles
+} 
+```
+
+```{r examples-define_profile}
+# Example with your dataset in "inst/"
+datafile <- system.file("data_test.csv", package = "strainselect")
+raw_data <- read.csv(datafile, sep = ";",header = T)
+prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
+              id=1,date=17,m=FALSE,a=TRUE)
+upset_data <- prepare_upset(prepared_data)
+# Apply my function
+define_profiles(upset_data)
+```
+
+# select_profiles function
+
+```{=html}
+<!--
+Because the define_profiles function groups strains by identical profile, select_profiles function randomly choose one strain of each group. 
+-->
+```
+```{r function-select_profiles}
+#' select_profiles
+#'
+#' @param profiles a data frame
+#' @param prepared_data a data frame
+#'
+#' @return a data frame
+#' @export
+#'
+#' @examples
+select_profiles <- function(profiles, prepared_data){
+  selected_data <- prepared_data
+  selected_data$group <- profiles$group
+  selected_data$size <- profiles$freq
+  k<- max(profiles$group)
+  n=nrow(selected_data)
+  selection <-rep(NA,k)
+  for (j in 1:k){
+      selection[j] <-sample(profiles$names[profiles$group==j],1)
+  }
+  for (i in 1:n){
+    for (j in 1:k){
+      if (selected_data$group[i]==j){
+        selected_data$selected[i] <- selection[j]
+      }
+    }
+  }
+  selected_data
+}
+```
+
+```{r examples-select_profile}
+# Example with your dataset in "inst/"
+datafile <- system.file("data_test.csv", package = "strainselect")
+raw_data <- read.csv(datafile, sep = ";",header = T)
+prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
+              id=1,date=17,m=FALSE,a=TRUE)
+upset_data <- prepare_upset(prepared_data)
+upset_profiles <- define_profiles(upset_data)
+# Apply my function
+select_profiles(upset_profiles,prepared_data)
+```
+
 ```{r development-inflate, eval=FALSE}
 # Keep eval=FALSE to avoid infinite loop in case you hit the knit button
 # Execute in the console directly

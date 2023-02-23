@@ -1,5 +1,5 @@
 ---
-title: "Development actions history"
+title: "Strain select"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -15,17 +15,18 @@ All commands that you use to use when developing packages...
 # Describe your package
 fusen::fill_description(
   pkg = here::here(),
+  overwrite = TRUE,
   fields = list(
-    Title = "Build A Package From Rmarkdown File",
-    Description = "Use Rmarkdown First method to build your package. Start your package with documentation. Everything can be set from a Rmarkdown file in your project.",
+    Title = "Strain selection",
+    Description = "selection of strains using a clustering method",
     `Authors@R` = c(
-      person("Sebastien", "Rochette", email = "sebastien@thinkr.fr", role = c("aut", "cre"), comment = c(ORCID = "0000-0002-1565-9313")),
-      person(given = "ThinkR", role = "cph")
+      person("Marie", "Vallée", email = "marie.vallee@anses.fr", role = "aut", comment = c(ORCID = "0000-0002-4233-8400")),
+      person("Laurent", "Guillier", email = "laurent.guillier@anses.fr", role = "cre", comment = c(ORCID = "0000-0002-7867-2937"))
     )
   )
 )
 # Define License with use_*_license()
-usethis::use_mit_license("Sébastien Rochette")
+usethis::use_mit_license("Marie Vallée")
 ```
 
 # Start using git

@@ -4,29 +4,10 @@
 \alias{assess_gower}
 \title{assess_gower}
 \usage{
-assess_gower(
-  data,
-  col_select = c(1:length(data)),
-  id = 1,
-  date = 0,
-  m = FALSE,
-  a = TRUE,
-  weights = rep.int(1, p),
-  graph = TRUE
-)
+assess_gower(clean_data, weights = rep.int(1, p), graph = TRUE)
 }
 \arguments{
-\item{data}{a dataframe}
-
-\item{col_select}{a vector}
-
-\item{id}{a number}
-
-\item{date}{a number}
-
-\item{m}{a boolean}
-
-\item{a}{a boolean}
+\item{clean_data}{a dataframe}
 
 \item{weights}{a vector}
 
@@ -42,7 +23,8 @@ assess_gower
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
 raw_data <- read.csv(datafile, sep = ";",header = T)
+prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
+              id=1,date=17,m=FALSE,a=TRUE)
 # Apply my function
-assess_gower(raw_data,col_select = c(7,10,13,14,17,24), 
-                      id=1,date=17,m=FALSE,a=TRUE, graph = T)
+assess_gower(prepared_data, graph = T)
 }
