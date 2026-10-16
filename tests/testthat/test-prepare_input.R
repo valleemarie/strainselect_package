@@ -13,7 +13,7 @@ test_that("prepare_input selects columns, extracts dates and replaces NA", {
     COUNTRY = c("FR", "FR", "IT")
   )
   expect_message(
-    res <- prepare_input(raw, col_select = 2:4, id = 1, date = 3, m = TRUE, a = TRUE),
+    res <- prepare_input(raw, col_select = 2:4, id = 1, date = 3, month = TRUE, year = TRUE),
     "no duplicate ID"
   )
   expect_equal(rownames(res), c("s1", "s2", "s3"))
@@ -25,4 +25,19 @@ test_that("prepare_input selects columns, extracts dates and replaces NA", {
   expect_silent(suppressMessages(prepare_input(raw, col_select = 2:4, id = 1, date = 3)))
   res_year <- suppressMessages(prepare_input(raw, col_select = 2:4, id = 1, date = 3))
   expect_equal(colnames(res_year), c("HOST", "COUNTRY", "ANNEE"))
+})
+
+test_that("prepare_input drops the identifier column by default", {
+  raw <- data.frame(ID = c("s1", "s2"), HOST = c("pig", "cattle"))
+  res <- suppressMessages(prepare_input(raw))
+  expect_equal(colnames(res), "HOST")
+})
+
+test_that("prepare_input still accepts the deprecated m and a arguments", {
+  raw <- data.frame(ID = c("s1", "s2"), DATE = c("09/01/2020", "15/03/2021"))
+  expect_warning(
+    res <- suppressMessages(prepare_input(raw, id = 1, date = 2, m = TRUE, a = FALSE)),
+    "deprecated"
+  )
+  expect_equal(colnames(res), "MOIS")
 })

@@ -8,7 +8,7 @@ test_that("cstats_table returns the cluster stats table", {
   )
   gower <- assess_gower(prepared_data, graph = FALSE)
   expect_message(
-    stats <- cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, l = 10,
+    stats <- cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, step = 10,
                           graph_silhouette = FALSE),
     "testing 10 clusters"
   )
@@ -16,6 +16,14 @@ test_that("cstats_table returns the cluster stats table", {
   expect_equal(nrow(stats), 3)
   expect_equal(stats$cluster.number, c(10, 20, 30))
   expect_true(all(stats$avg.silwidth >= -1 & stats$avg.silwidth <= 1))
-  expect_error(cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 25, l = 10),
+  expect_error(cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 25, step = 10),
                "multiple")
+  expect_warning(
+    old_style <- suppressMessages(
+      cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, l = 10,
+                   graph_silhouette = FALSE)
+    ),
+    "deprecated"
+  )
+  expect_identical(old_style, stats)
 })

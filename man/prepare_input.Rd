@@ -2,42 +2,55 @@
 % Please edit documentation in R/prepare_input.R
 \name{prepare_input}
 \alias{prepare_input}
-\title{prepare_input}
+\title{Prepare the metadata table used for strain selection}
 \usage{
 prepare_input(
   data,
-  col_select = c(1:length(data)),
+  col_select = seq_along(data),
   id = 1,
   date = 0,
-  m = FALSE,
-  a = TRUE
+  month = FALSE,
+  year = TRUE,
+  m,
+  a
 )
 }
 \arguments{
-\item{data}{a dataframe}
+\item{data}{A data frame with one row per strain.}
 
-\item{col_select}{a vector}
+\item{col_select}{Integer vector giving the positions of the metadata
+columns to keep. The identifier and date columns are always removed from
+this selection. Defaults to all columns.}
 
-\item{id}{a number}
+\item{id}{Position of the column containing the strain identifiers.}
 
-\item{date}{a number}
+\item{date}{Position of the date column (format \code{dd/mm/yyyy}), or \code{0}
+(default) if no date should be used.}
 
-\item{m}{a boolean}
+\item{month}{If \code{TRUE}, a \code{MOIS} column with the month (\code{"01"} to \code{"12"})
+is created from the date column.}
 
-\item{a}{a boolean}
+\item{year}{If \code{TRUE} (default), an \code{ANNEE} column with the year is created
+from the date column.}
+
+\item{m, a}{Deprecated, use \code{month} and \code{year} instead.}
 }
 \value{
-a dataframe
+A data frame with one row per strain (row names are the strain
+identifiers) and one factor column per selected metadata, followed by
+\code{ANNEE} and/or \code{MOIS} when a date column is used.
 }
 \description{
-prepare_input
+Checks that strain identifiers are unique, keeps the metadata columns used
+for the selection, optionally extracts the year and/or the month from a
+date column, replaces missing values by \code{"unknown"} and converts every
+column to a factor.
 }
 \examples{
-
-# Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-# Apply my function
-prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17, month = FALSE, year = TRUE)
+head(prepared_data)
 }
+\concept{data preparation}

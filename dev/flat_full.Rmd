@@ -1,8 +1,7 @@
 ---
-!---
 title: "flat_full.Rmd for working package"
 output: html_document
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
 
@@ -11,15 +10,6 @@ editor_options:
 <!-- Store every call to library() that you need to explore your functions -->
 
 ```{r development, include=FALSE}
-library(cluster) 
-library(fpc)
-library(ggplot2)
-library(dplyr)
-library(dendextend)
-library(UpSetR)
-library(nomclust)
-library(factoextra)
-library(tidyr)
 library(testthat)
 ```
 
@@ -28,43 +18,80 @@ library(testthat)
 pkgload::load_all(export_all = FALSE)
 ```
 
-# Data examples
+# Overview
 
-```{=html}
-```
-```{r development-dataset}
-pkgload::load_all(path = here::here(), export_all = FALSE)
+{strainselect} helps choosing which bacterial strains to sequence from a
+collection described by metadata (sampling context, matrix, region, sector,
+year...). It offers two complementary methods:
 
-datafile <- system.file("data_test.csv", package = "strainselect")
-row_data <- read.csv(datafile, sep = ";",header = TRUE)
+- the **clustering method** (`assess_gower()`, `cstats_table()`,
+  `select_silhouette()`) is suited when the number of strains that can be
+  sequenced is limited. Strains are grouped into *k* clusters of similar
+  strains and the best clustered strain of each cluster is selected, so that
+  the selected strains are as different as possible from each other;
+- the **profile method** (`prepare_upset()`, `define_profiles()`,
+  `select_profiles()`) is suited when the number of strains to sequence is
+  not limited. Strains sharing exactly the same metadata are grouped and one
+  strain per group is selected, so that every distinct profile — including
+  unique strains — is represented.
 
-row_data
-```
+Both methods start with `prepare_input()`, which cleans the raw table.
 
-# prepare_input function
+The examples below use `data_test.csv`, a table of 100 *Salmonella* strains
+described by 24 variables, shipped with the package. The selection is based on
+6 variables: `CONTEXTE`, `MATRICE1`, `REGION`, `SECTEUR`, `LIEUPVT` and the
+year extracted from `DATE_PRELEVEMENT`.
 
-```{=html}
-<!--
-Include a data table describing bacterial strains according to a number of metadata.
-The prepare_input function tests if the strain ID are all different and extracts the metadata selected by the user.
-The user can choose to extract the month or the year or both data from the date entered in the initial table.
--->
-```
+# Preparing the data: prepare_input
+
+Before using any of the methods, the dataset must be cleaned and contain only
+the metadata on which the selection is based. `prepare_input()`:
+
+- checks that strain identifiers are unique (and stops with the list of
+  duplicated identifiers otherwise);
+- uses the identifiers as row names;
+- keeps only the selected metadata columns;
+- optionally extracts the year (`ANNEE`) and/or the month (`MOIS`) from a date
+  column in the `dd/mm/yyyy` format;
+- replaces missing values by `"unknown"` and converts every column to a factor.
+
 ```{r function-prepare_input}
-#' prepare_input
+#' Prepare the metadata table used for strain selection
 #'
-#' @param data a dataframe
-#' @param col_select a vector
-#' @param id a number
-#' @param date a number
-#' @param m a boolean
-#' @param a a boolean
+#' Checks that strain identifiers are unique, keeps the metadata columns used
+#' for the selection, optionally extracts the year and/or the month from a
+#' date column, replaces missing values by `"unknown"` and converts every
+#' column to a factor.
 #'
-#' @return a dataframe
+#' @param data A data frame with one row per strain.
+#' @param col_select Integer vector giving the positions of the metadata
+#'   columns to keep. The identifier and date columns are always removed from
+#'   this selection. Defaults to all columns.
+#' @param id Position of the column containing the strain identifiers.
+#' @param date Position of the date column (format `dd/mm/yyyy`), or `0`
+#'   (default) if no date should be used.
+#' @param month If `TRUE`, a `MOIS` column with the month (`"01"` to `"12"`)
+#'   is created from the date column.
+#' @param year If `TRUE` (default), an `ANNEE` column with the year is created
+#'   from the date column.
+#' @param m,a Deprecated, use `month` and `year` instead.
+#'
+#' @return A data frame with one row per strain (row names are the strain
+#'   identifiers) and one factor column per selected metadata, followed by
+#'   `ANNEE` and/or `MOIS` when a date column is used.
 #' @export
+#' @family data preparation
 #' @examples
-prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
-                           m=FALSE, a=TRUE) {
+prepare_input <- function (data, col_select = seq_along(data), id = 1, date = 0,
+                           month = FALSE, year = TRUE, m, a) {
+  if (!missing(m)) {
+    warning("`m` is deprecated, use `month` instead.", call. = FALSE)
+    month <- m
+  }
+  if (!missing(a)) {
+    warning("`a` is deprecated, use `year` instead.", call. = FALSE)
+    year <- a
+  }
   duplicate <- which(duplicated(data[,id]))
   if (length(duplicate)!=0) {
     stop ( "duplicate ID : " , paste(data[duplicate,id], collapse = ", "))
@@ -72,13 +99,13 @@ prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
     message("no duplicate ID")
   }
   rownames(data) <- data[,id]
-  col_select<-col_select[! col_select %in% date]
-  clean_data <- data[,col_select]
+  col_select <- col_select[! col_select %in% c(id, date)]
+  clean_data <- data[, col_select, drop = FALSE]
   if (date!=0){
-    if(a){
+    if(year){
       clean_data$ANNEE <- substr(data[,date],7,10)
     }
-    if(m){
+    if(month){
       clean_data$MOIS <- substr(data[,date],4,5)
     }
   }
@@ -90,13 +117,11 @@ prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
 ```
 
 ```{r examples-prepare_input}
-
-# Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-# Apply my function
-prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17, month = FALSE, year = TRUE)
+head(prepared_data)
 ```
 
 ```{r tests-prepare_input}
@@ -113,7 +138,7 @@ test_that("prepare_input selects columns, extracts dates and replaces NA", {
     COUNTRY = c("FR", "FR", "IT")
   )
   expect_message(
-    res <- prepare_input(raw, col_select = 2:4, id = 1, date = 3, m = TRUE, a = TRUE),
+    res <- prepare_input(raw, col_select = 2:4, id = 1, date = 3, month = TRUE, year = TRUE),
     "no duplicate ID"
   )
   expect_equal(rownames(res), c("s1", "s2", "s3"))
@@ -126,28 +151,59 @@ test_that("prepare_input selects columns, extracts dates and replaces NA", {
   res_year <- suppressMessages(prepare_input(raw, col_select = 2:4, id = 1, date = 3))
   expect_equal(colnames(res_year), c("HOST", "COUNTRY", "ANNEE"))
 })
+
+test_that("prepare_input drops the identifier column by default", {
+  raw <- data.frame(ID = c("s1", "s2"), HOST = c("pig", "cattle"))
+  res <- suppressMessages(prepare_input(raw))
+  expect_equal(colnames(res), "HOST")
+})
+
+test_that("prepare_input still accepts the deprecated m and a arguments", {
+  raw <- data.frame(ID = c("s1", "s2"), DATE = c("09/01/2020", "15/03/2021"))
+  expect_warning(
+    res <- suppressMessages(prepare_input(raw, id = 1, date = 2, m = TRUE, a = FALSE)),
+    "deprecated"
+  )
+  expect_equal(colnames(res), "MOIS")
+})
 ```
 
-# assess_gower function
+# Clustering method
 
-```{=html}
-<!--
-Include a data table describing bacterial strains according to a number of metadata.
-The assess_gower function runs the prepare_input function on the raw data table.
-Gower distances are calculated from the dataframe returned by the prepare_input function. The user can choose to apply weights on the metadata he wants to weight. 
-A hierarchical cluster analysis is performed using the gower distances and the "complete" method. 
-The dendrogram resulting from the hierarchical cluster analysis is plotted if graph=True.
--->
-```
+The clustering method uses three functions: `assess_gower()`,
+`cstats_table()` and `select_silhouette()`. `cstats_table()` is optional when
+the number of strains to sequence is fixed in advance.
+
+## Distances and tree: assess_gower
+
+`assess_gower()` computes a dissimilarity matrix between strains using the
+Gower distance, which is suited to categorical metadata. Weights can be given
+to the metadata to adjust their importance in the clustering. A hierarchical
+clustering with complete linkage is then performed on this matrix, and the
+dendrogram is drawn when `graph = TRUE`.
+
 ```{r function-assess_gower}
-#' assess_gower
+#' Compute Gower distances and the hierarchical clustering tree
 #'
-#' @param clean_data a dataframe
-#' @param weights a vector
-#' @param graph a boolean
+#' Computes the Gower dissimilarity between strains (suited to categorical
+#' metadata) and performs an agglomerative hierarchical clustering with
+#' complete linkage.
 #'
-#' @return a list containing the components clean_data, gower_dist, aggl.clust.c
+#' @param clean_data A data frame of factors, one row per strain, as returned
+#'   by [prepare_input()].
+#' @param weights Numeric vector of weights, one per column of `clean_data`,
+#'   to give more or less importance to each metadata. Defaults to equal
+#'   weights.
+#' @param graph If `TRUE` (default), the dendrogram is plotted.
+#'
+#' @return A list with two components:
+#'   \describe{
+#'     \item{gower_dist}{the Gower dissimilarity matrix, an object of class
+#'       `dissimilarity` / `dist` (see [cluster::daisy()]);}
+#'     \item{aggl.clust.c}{the clustering tree, an object of class `hclust`.}
+#'   }
 #' @export
+#' @family clustering method
 #' @importFrom cluster daisy
 #' @importFrom stats hclust
 #'
@@ -164,13 +220,11 @@ assess_gower <- function(clean_data, weights = rep.int(1, p), graph = TRUE){
 ```
 
 ```{r examples-assess_gower}
-# Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-# Apply my function
-assess_gower(prepared_data, graph = TRUE)
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17)
+gower <- assess_gower(prepared_data, graph = TRUE)
 ```
 
 ```{r tests-assess_gower}
@@ -193,33 +247,54 @@ test_that("assess_gower returns a Gower distance and a complete-linkage tree", {
 })
 ```
 
-# cstats_table function
+## Choosing the number of clusters: cstats_table
 
-```{=html}
-<!--
-cstat_table create a dataframe including Cluster stats. The avg.silwidth is the data we are most interest in because it will be used to determine the optimal number of cluster to choose if necessary.
-The user enters a distance object and a dendogram object resulting from the function assess_gower. He can choose the number of cluster to test and a step to improve the execution time of the function.
--->
-```
+`cstats_table()` computes clustering statistics (see `fpc::cluster.stats()`)
+for an increasing number of clusters: `step`, `2 * step`, ..., up to `k`. The
+average silhouette width (`avg.silwidth`) is the most useful one: it is
+plotted against the number of clusters, and the optimal number of clusters is
+marked by a maximum or a plateau of the curve. The idea is to test a large
+number of clusters without exceeding the number of strains that can be
+sequenced; a larger `step` reduces the computing time.
+
 ```{r function-cstats_table}
-#' cstats_table
+#' Clustering statistics for an increasing number of clusters
 #'
-#' @param dist a distance object 
-#' @param tree a dendrogram object
-#' @param k a number
-#' @param l a number
-#' @param graph_silhouette a boolean
+#' Cuts the clustering tree into `step`, `2 * step`, ..., `k` clusters and
+#' computes, for each number of clusters, the statistics of
+#' [fpc::cluster.stats()]. The average silhouette width can be plotted to help
+#' choosing the number of clusters.
 #'
-#' @return a dataframe with one row per number of clusters tested
+#' @param dist A dissimilarity object, e.g. `gower_dist` returned by
+#'   [assess_gower()].
+#' @param tree An `hclust` object, e.g. `aggl.clust.c` returned by
+#'   [assess_gower()].
+#' @param k Largest number of clusters to test. Must be a multiple of `step`.
+#' @param step Increment between two numbers of clusters tested.
+#' @param graph_silhouette If `TRUE` (default), the average silhouette width
+#'   is plotted against the number of clusters.
+#' @param l Deprecated, use `step` instead.
+#'
+#' @return A data frame with one row per number of clusters tested (row names
+#'   `Test <number of clusters>`) and the columns `cluster.number`, `n`,
+#'   `within.cluster.ss`, `average.within`, `average.between`, `wb.ratio`,
+#'   `dunn2`, `avg.silwidth` (see [fpc::cluster.stats()]), followed by
+#'   cluster size columns. Values are rounded to 2 decimals.
 #' @export
+#' @family clustering method
 #' @importFrom fpc cluster.stats
 #' @importFrom stats cutree
 #' @importFrom ggplot2 ggplot aes .data geom_point geom_line ggtitle labs theme element_text
 #'
 #' @examples
-cstats_table <- function(dist, tree, k,l, graph_silhouette =TRUE) {
+cstats_table <- function(dist, tree, k, step, graph_silhouette = TRUE, l) {
+   if (!missing(l)) {
+     warning("`l` is deprecated, use `step` instead.", call. = FALSE)
+     step <- l
+   }
+   l <- step
    if (k %% l != 0) {
-     stop("k must be a multiple of l")
+     stop("k must be a multiple of step")
    }
    n=k/l
    clust.assess <- c("cluster.number","n","within.cluster.ss","average.within","average.between",
@@ -249,7 +324,6 @@ cstats_table <- function(dist, tree, k,l, graph_silhouette =TRUE) {
    cluster.sizes <- data.frame(cluster.sizes)
    cluster.sizes[is.na(cluster.sizes)] <- 0
    rows.all <- c(clust.assess, row.clust)
-   # rownames(output.stats.df) <- clust.assess
    output <- rbind(output.stats.df, cluster.sizes)
    colnames(output) <- stats.names[1:n]
    rownames(output) <- rows.all
@@ -270,14 +344,14 @@ cstats_table <- function(dist, tree, k,l, graph_silhouette =TRUE) {
 ```
 
 ```{r examples-cstats_table}
-# Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-gower <- assess_gower(prepared_data, graph = TRUE)
-# Apply my function
-cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c, k = 50,l = 10)
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17)
+gower <- assess_gower(prepared_data, graph = FALSE)
+stats <- cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c,
+                      k = 50, step = 10)
+stats[, c("cluster.number", "avg.silwidth")]
 ```
 
 ```{r tests-cstats_table}
@@ -289,7 +363,7 @@ test_that("cstats_table returns the cluster stats table", {
   )
   gower <- assess_gower(prepared_data, graph = FALSE)
   expect_message(
-    stats <- cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, l = 10,
+    stats <- cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, step = 10,
                           graph_silhouette = FALSE),
     "testing 10 clusters"
   )
@@ -297,36 +371,62 @@ test_that("cstats_table returns the cluster stats table", {
   expect_equal(nrow(stats), 3)
   expect_equal(stats$cluster.number, c(10, 20, 30))
   expect_true(all(stats$avg.silwidth >= -1 & stats$avg.silwidth <= 1))
-  expect_error(cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 25, l = 10),
+  expect_error(cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 25, step = 10),
                "multiple")
+  expect_warning(
+    old_style <- suppressMessages(
+      cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, l = 10,
+                   graph_silhouette = FALSE)
+    ),
+    "deprecated"
+  )
+  expect_identical(old_style, stats)
 })
 ```
 
-# select_silhouette function
+## Selecting the strains: select_silhouette
 
-```{=html}
-<!--
-After setting the number of cluster chosen, the select_silhouette function selects the strain for each cluster that has the maximum silhouette, i.e. the one that is the best clustered.
-If there are multiple strains with a maximum silhouette for the same cluster a random selection is made between the strains concerned.
+The last step selects one strain to sequence in each cluster. The number of
+clusters `k` is either chosen from the silhouette plot or set to the number of
+strains that can be sequenced. For each cluster, the strain with the largest
+silhouette width — i.e. the best clustered strain — is selected. When several
+strains share the largest silhouette width in a cluster, one of them is chosen
+at random; use `seed` to make this choice reproducible.
 
-This function return a data frame with for each strain, its characteristics, its cluster, the corresponding cluster size and the strain selected for its cluster.
--->
-```
 ```{r function-select_silhouette}
-#' select_silhouette
+#' Select the best clustered strain of each cluster
 #'
-#' @param prepared_data a data frame
-#' @param dist a distance object
-#' @param k a integer
-#' @param isdiss logical value specifying wether x is a dissimilarity matrix
-#' @param hc_func the hierarchical clustering function to be used
-#' @param hc_method he agglomeration method to be used
-#' @param seed an integer passed to set.seed() to make the choice between
-#'   ex aequo strains reproducible, or NULL (default) to leave the random
-#'   number generator untouched
+#' Cuts the strains into `k` clusters with [factoextra::hcut()] and selects,
+#' in each cluster, the strain with the largest silhouette width. When several
+#' strains share the largest silhouette width, one of them is chosen at
+#' random.
 #'
-#' @return a data frame
+#' @param prepared_data A data frame with one row per strain, as returned by
+#'   [prepare_input()]. Its rows must be in the same order as in `dist`.
+#' @param dist A dissimilarity object, e.g. `gower_dist` returned by
+#'   [assess_gower()].
+#' @param k Number of clusters, i.e. number of strains to select. Must be
+#'   between 2 and the number of strains minus 1.
+#' @param isdiss Logical, whether `dist` is a dissimilarity object (default:
+#'   `TRUE` when `dist` inherits from `"dist"`).
+#' @param hc_func Hierarchical clustering function passed to
+#'   [factoextra::hcut()]: `"hclust"` (default), `"agnes"` or `"diana"`.
+#' @param hc_method Agglomeration method passed to [factoextra::hcut()],
+#'   `"complete"` by default.
+#' @param seed An integer passed to [set.seed()] to make the choice between
+#'   ex aequo strains reproducible, or `NULL` (default) to leave the random
+#'   number generator untouched.
+#'
+#' @return `prepared_data` with three additional columns:
+#'   \describe{
+#'     \item{cluster}{the cluster of the strain;}
+#'     \item{size}{the number of strains in this cluster;}
+#'     \item{selected}{the identifier of the strain selected for this
+#'       cluster.}
+#'   }
+#'   The selected strains are given by `unique(result$selected)`.
 #' @export
+#' @family clustering method
 #' @importFrom factoextra hcut
 #'
 #' @examples
@@ -359,12 +459,14 @@ select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(dist, "
 
 ```{r examples-select_silhouette}
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-gower <- assess_gower(prepared_data, graph = TRUE)
-
-select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, hc_func = "hclust", hc_method = "complete")
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17)
+gower <- assess_gower(prepared_data, graph = FALSE)
+selection <- select_silhouette(prepared_data, dist = gower$gower_dist, k = 20,
+                               seed = 1)
+# the 20 strains to sequence
+unique(selection$selected)
 ```
 
 ```{r tests-select_silhouette}
@@ -399,20 +501,36 @@ test_that("select_silhouette is reproducible with seed and checks k", {
 })
 ```
 
-# prepare_upset function
+# Profile method
 
-```{=html}
-<!--
-The prepare_upset allows to prepare the dataframe used to visualize the interactions. it uses the modalities of the different variables of prepared_data dataframe as columns and fills the rows with 1 if the strain is concerned by the modality and 0 otherwise.
--->
-```
+This method groups strains that are strictly identical for all the selected
+metadata, and selects one strain per group. Unlike the clustering method, all
+strains of a group are identical, and strains that are similar to no other
+strain form a group on their own. It uses three functions: `prepare_upset()`,
+`define_profiles()` and `select_profiles()`.
+
+## Binary table: prepare_upset
+
+`prepare_upset()` creates a binary table from the prepared data: there is one
+column per modality of each metadata (named `<metadata> _ <modality>`), filled
+with 1 if the strain has this modality and 0 otherwise.
+
 ```{r function-prepare_upset}
-#' prepare_upset
+#' Build the binary table of metadata modalities
 #'
-#' @param prepared_data a dataframe
+#' Creates one column per modality of each metadata, filled with 1 when the
+#' strain has this modality and 0 otherwise. The result can be used to draw an
+#' UpSet plot (e.g. with `UpSetR::upset()`) and to define profiles with
+#' [define_profiles()].
 #'
-#' @return a dataframe
+#' @param prepared_data A data frame with one row per strain, as returned by
+#'   [prepare_input()].
+#'
+#' @return A data frame with the same row names as `prepared_data` and one
+#'   numeric (0/1) column per modality, named `"<metadata> _ <modality>"`.
+#'   Modalities appear in their order of first appearance.
 #' @export
+#' @family profile method
 #'
 #' @examples
 prepare_upset<- function(prepared_data){
@@ -432,13 +550,20 @@ prepare_upset<- function(prepared_data){
 ```
 
 ```{r examples-prepare_upset}
-# Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-# Apply my function
-prepare_upset(prepared_data)
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17)
+upset_data <- prepare_upset(prepared_data)
+upset_data[1:5, 1:4]
+```
+
+The binary table can be used to visualise the groups of identical strains in
+an UpSet plot, for instance with the {UpSetR} package:
+
+```{r upset-plot, eval = requireNamespace("UpSetR", quietly = TRUE), fig.width = 7, fig.height = 5}
+UpSetR::upset(upset_data, nsets = ncol(upset_data), order.by = "freq",
+              mb.ratio = c(0.3, 0.7), nintersects = 30)
 ```
 
 ```{r tests-prepare_upset}
@@ -459,22 +584,32 @@ test_that("prepare_upset builds a binary table with one column per modality", {
 })
 ```
 
-# define_profile function
+## Groups of identical strains: define_profiles
 
-```{=html}
-<!--
-This function uses the output of pepare_upset function to create a new data frame with a column "profiles" resulting  from the concatenation of the columns of the input data frame and a colonne that identify the group of the strain. 
-Strain are grouped by identical profiles which allows to consider also the strains with a unique profile.
--->
-```
+`define_profiles()` builds a profile for each strain by concatenating the
+columns of the binary table. Strains with identical profiles are put in the
+same group; a profile shared by no other strain forms a group with a single
+strain.
+
 ```{r function-define_profiles}
-#' define_profiles
+#' Group strains with identical profiles
 #'
-#' @param data a data frame
-#' @param sep  Separator to use between values
+#' Concatenates the columns of the binary table into one profile per strain
+#' and gives the same group number to strains with identical profiles.
 #'
-#' @return a data frame
+#' @param data A data frame with one row per strain, typically the binary
+#'   table returned by [prepare_upset()].
+#' @param sep Separator used between values when building the profiles
+#'   (none by default).
+#'
+#' @return A data frame with the same row names as `data` and three columns:
+#'   \describe{
+#'     \item{profiles}{the profile of the strain (concatenated values);}
+#'     \item{group}{an integer identifying the group of identical profiles;}
+#'     \item{names}{the strain identifier.}
+#'   }
 #' @export
+#' @family profile method
 #'
 #' @examples
 define_profiles <- function (data, sep = ""){
@@ -486,15 +621,15 @@ define_profiles <- function (data, sep = ""){
 }
 ```
 
-```{r examples-define_profile}
-# Example with your dataset in "inst/"
+```{r examples-define_profiles}
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17)
 upset_data <- prepare_upset(prepared_data)
-# Apply my function
-define_profiles(upset_data)
+upset_profiles <- define_profiles(upset_data)
+# number of distinct profiles
+max(upset_profiles$group)
 ```
 
 ```{r tests-define_profiles}
@@ -515,24 +650,34 @@ test_that("define_profiles gives the same group to identical profiles", {
 })
 ```
 
-# select_profiles function
+## Selecting the strains: select_profiles
 
-```{=html}
-<!--
-Because the define_profiles function groups strains by identical profile, select_profiles function randomly choose one strain of each group. 
--->
-```
+Finally, `select_profiles()` selects one strain per group. A group containing
+a single strain gets this strain; since all strains of a larger group are
+identical, one of them is chosen at random. Use `seed` to make the selection
+reproducible.
+
 ```{r function-select_profiles}
-#' select_profiles
+#' Select one strain per group of identical profiles
 #'
-#' @param profiles a data frame
-#' @param prepared_data a data frame
-#' @param seed an integer passed to set.seed() to make the random choice of
-#'   the representative strains reproducible, or NULL (default) to leave the
-#'   random number generator untouched
+#' Selects at random one strain in each group defined by [define_profiles()].
 #'
-#' @return a data frame
+#' @param profiles A data frame returned by [define_profiles()].
+#' @param prepared_data A data frame with one row per strain, as returned by
+#'   [prepare_input()], with rows in the same order as `profiles`.
+#' @param seed An integer passed to [set.seed()] to make the random choice of
+#'   the representative strains reproducible, or `NULL` (default) to leave the
+#'   random number generator untouched.
+#'
+#' @return `prepared_data` with three additional columns:
+#'   \describe{
+#'     \item{group}{the group of identical profiles of the strain;}
+#'     \item{size}{the number of strains in this group;}
+#'     \item{selected}{the identifier of the strain selected for this group.}
+#'   }
+#'   The selected strains are given by `unique(result$selected)`.
 #' @export
+#' @family profile method
 #'
 #' @examples
 select_profiles <- function(profiles, prepared_data, seed = NULL){
@@ -549,16 +694,15 @@ select_profiles <- function(profiles, prepared_data, seed = NULL){
 }
 ```
 
-```{r examples-select_profile}
-# Example with your dataset in "inst/"
+```{r examples-select_profiles}
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-upset_data <- prepare_upset(prepared_data)
-upset_profiles <- define_profiles(upset_data)
-# Apply my function
-select_profiles(upset_profiles,prepared_data)
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17)
+upset_profiles <- define_profiles(prepare_upset(prepared_data))
+selection <- select_profiles(upset_profiles, prepared_data, seed = 1)
+# one strain per distinct profile
+length(unique(selection$selected))
 ```
 
 ```{r tests-select_profiles}
@@ -586,12 +730,3 @@ test_that("define_profiles and select_profiles select one strain per profile", {
 # Execute in the console directly
 fusen::inflate(flat_file = "dev/flat_full.Rmd", vignette_name = "Get started")
 ```
-
-# Inflate your package
-
-You're one inflate from paper to box. Build your package from this very Rmd using `fusen::inflate()`
-
--   Verify your `"DESCRIPTION"` file has been updated
--   Verify your function is in `"R/"` directory
--   Verify your test is in `"tests/testthat/"` directory
--   Verify this Rmd appears in `"vignettes/"` directory

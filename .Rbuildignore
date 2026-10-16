@@ -6,3 +6,7 @@
 ^strainselect\.Rproj$
 ^How_to_use_Strainselect$
 ^\.Rhistory$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^\.github$

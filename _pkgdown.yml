@@ -1,0 +1,20 @@
+url: https://valleemarie.github.io/strainselect_package/
+template:
+  bootstrap: 5
+
+reference:
+- title: Data preparation
+  contents:
+  - prepare_input
+- title: Clustering method
+  desc: When the number of strains that can be sequenced is limited.
+  contents:
+  - assess_gower
+  - cstats_table
+  - select_silhouette
+- title: Profile method
+  desc: When the number of strains to sequence is not limited.
+  contents:
+  - prepare_upset
+  - define_profiles
+  - select_profiles

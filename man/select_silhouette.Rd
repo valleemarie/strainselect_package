@@ -2,7 +2,7 @@
 % Please edit documentation in R/select_silhouette.R
 \name{select_silhouette}
 \alias{select_silhouette}
-\title{select_silhouette}
+\title{Select the best clustered strain of each cluster}
 \usage{
 select_silhouette(
   prepared_data,
@@ -15,34 +15,58 @@ select_silhouette(
 )
 }
 \arguments{
-\item{prepared_data}{a data frame}
+\item{prepared_data}{A data frame with one row per strain, as returned by
+\code{\link[=prepare_input]{prepare_input()}}. Its rows must be in the same order as in \code{dist}.}
 
-\item{dist}{a distance object}
+\item{dist}{A dissimilarity object, e.g. \code{gower_dist} returned by
+\code{\link[=assess_gower]{assess_gower()}}.}
 
-\item{k}{a integer}
+\item{k}{Number of clusters, i.e. number of strains to select. Must be
+between 2 and the number of strains minus 1.}
 
-\item{isdiss}{logical value specifying wether x is a dissimilarity matrix}
+\item{isdiss}{Logical, whether \code{dist} is a dissimilarity object (default:
+\code{TRUE} when \code{dist} inherits from \code{"dist"}).}
 
-\item{hc_func}{the hierarchical clustering function to be used}
+\item{hc_func}{Hierarchical clustering function passed to
+\code{\link[factoextra:hcut]{factoextra::hcut()}}: \code{"hclust"} (default), \code{"agnes"} or \code{"diana"}.}
 
-\item{hc_method}{he agglomeration method to be used}
+\item{hc_method}{Agglomeration method passed to \code{\link[factoextra:hcut]{factoextra::hcut()}},
+\code{"complete"} by default.}
 
-\item{seed}{an integer passed to set.seed() to make the choice between
-ex aequo strains reproducible, or NULL (default) to leave the random
-number generator untouched}
+\item{seed}{An integer passed to \code{\link[=set.seed]{set.seed()}} to make the choice between
+ex aequo strains reproducible, or \code{NULL} (default) to leave the random
+number generator untouched.}
 }
 \value{
-a data frame
+\code{prepared_data} with three additional columns:
+\describe{
+\item{cluster}{the cluster of the strain;}
+\item{size}{the number of strains in this cluster;}
+\item{selected}{the identifier of the strain selected for this
+cluster.}
+}
+The selected strains are given by \code{unique(result$selected)}.
 }
 \description{
-select_silhouette
+Cuts the strains into \code{k} clusters with \code{\link[factoextra:hcut]{factoextra::hcut()}} and selects,
+in each cluster, the strain with the largest silhouette width. When several
+strains share the largest silhouette width, one of them is chosen at
+random.
 }
 \examples{
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-gower <- assess_gower(prepared_data, graph = TRUE)
-
-select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, hc_func = "hclust", hc_method = "complete")
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17)
+gower <- assess_gower(prepared_data, graph = FALSE)
+selection <- select_silhouette(prepared_data, dist = gower$gower_dist, k = 20,
+                               seed = 1)
+# the 20 strains to sequence
+unique(selection$selected)
 }
+\seealso{
+Other clustering method: 
+\code{\link{assess_gower}()},
+\code{\link{cstats_table}()}
+}
+\concept{clustering method}
