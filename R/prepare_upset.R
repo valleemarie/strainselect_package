@@ -16,25 +16,16 @@
 #' # Apply my function
 #' prepare_upset(prepared_data)
 prepare_upset<- function(prepared_data){
- upset_data <- data.frame(row.names = rownames(prepared_data))
- metadata <- colnames(prepared_data)
- for (i in 1:ncol(prepared_data)){
-   vect <- unique(prepared_data[,i])
-   tab <- matrix(0,nrow(prepared_data),length(vect))
-   col.names <- NULL
-   for (j in 1:length(vect)){
-     col.names <- c(col.names,paste(metadata[i],"_",vect[j]))
-     for (k in 1:nrow(prepared_data)){
-       if (!is.na(prepared_data[k,i])){
-         if(prepared_data[k,i]==vect[j]){
-           tab[k,j] <- 1
-         }
-       }
-     }
-   }
-   colnames(tab) <- col.names
-   upset_data <- cbind(upset_data,tab)
- } 
- upset_data
+  upset_data <- data.frame(row.names = rownames(prepared_data))
+  metadata <- colnames(prepared_data)
+  for (i in seq_along(prepared_data)){
+    x <- as.character(prepared_data[[i]])
+    vect <- unique(prepared_data[[i]])
+    tab <- 1 * outer(x, as.character(vect), "==")
+    tab[is.na(tab)] <- 0
+    colnames(tab) <- paste(metadata[i], "_", vect)
+    upset_data <- cbind(upset_data, tab)
+  }
+  upset_data
 }
 

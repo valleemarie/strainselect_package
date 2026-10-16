@@ -7,7 +7,6 @@
 #'
 #' @return a data frame
 #' @export
-#' @importFrom tidyr unite
 #'
 #' @examples
 #' # Example with your dataset in "inst/"
@@ -19,18 +18,9 @@
 #' # Apply my function
 #' define_profiles(upset_data)
 define_profiles <- function (data, sep = ""){
-  profiles <- unite(data,"profiles",c(1:ncol(data)), sep = sep)
-  profiles_freq <- as.data.frame(table(profiles))
-  profiles_freq$group <- c(1:nrow(profiles_freq))
-  n=nrow(profiles)
-  for (i in 1:n){
-    for (j in 1:nrow(profiles_freq)){
-      if (profiles$profiles[i]==profiles_freq$profiles[j]){
-        profiles$group[i]<-profiles_freq$group[j]
-      }
-    }
-  }
-  profiles$names<-rownames(profiles)
-  
+  profiles <- data.frame(profiles = do.call(paste, c(unname(as.list(data)), sep = sep)),
+                         row.names = rownames(data))
+  profiles$group <- as.integer(factor(profiles$profiles))
+  profiles$names <- rownames(profiles)
   profiles
-} 
+}

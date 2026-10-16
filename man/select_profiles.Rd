@@ -4,12 +4,16 @@
 \alias{select_profiles}
 \title{select_profiles}
 \usage{
-select_profiles(profiles, prepared_data)
+select_profiles(profiles, prepared_data, seed = NULL)
 }
 \arguments{
 \item{profiles}{a data frame}
 
 \item{prepared_data}{a data frame}
+
+\item{seed}{an integer passed to set.seed() to make the random choice of
+the representative strains reproducible, or NULL (default) to leave the
+random number generator untouched}
 }
 \value{
 a data frame

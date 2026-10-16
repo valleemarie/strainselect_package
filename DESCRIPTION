@@ -11,9 +11,7 @@ Imports:
     factoextra,
     fpc,
     ggplot2,
-    stats,
-    tidyr,
-    utils
+    stats
 Suggests: 
     knitr,
     rmarkdown,

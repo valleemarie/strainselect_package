@@ -62,7 +62,6 @@ The user can choose to extract the month or the year or both data from the date 
 #'
 #' @return a dataframe
 #' @export
-#' @importFrom utils str
 #' @examples
 prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
                            m=FALSE, a=TRUE) {
@@ -70,7 +69,7 @@ prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
   if (length(duplicate)!=0) {
     stop ( "duplicate ID : " , paste(data[duplicate,id], collapse = ", "))
   } else {
-    print("no duplicate ID")
+    message("no duplicate ID")
   }
   rownames(data) <- data[,id]
   col_select<-col_select[! col_select %in% date]
@@ -85,8 +84,7 @@ prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
   }
   clean_data[is.na(clean_data)] <- "unknown"
   clean_data[] <- lapply(clean_data, factor)
-  print(colnames(clean_data))
-  str(clean_data)
+  message("selected metadata: ", paste(colnames(clean_data), collapse = ", "))
   clean_data
 }
 ```
@@ -103,9 +101,30 @@ prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
 
 ```{r tests-prepare_input}
 data_test <- matrix("test",nrow = 3,ncol = 5)
-as.data.frame(data_test)
 test_that("prepare_input works properly and show error if needed", {
-  expect_error(prepare_input(data_test))
+  expect_error(prepare_input(data_test), "duplicate ID")
+})
+
+test_that("prepare_input selects columns, extracts dates and replaces NA", {
+  raw <- data.frame(
+    ID = c("s1", "s2", "s3"),
+    HOST = c("pig", NA, "cattle"),
+    DATE = c("09/01/2020", "15/03/2021", "30/12/2021"),
+    COUNTRY = c("FR", "FR", "IT")
+  )
+  expect_message(
+    res <- prepare_input(raw, col_select = 2:4, id = 1, date = 3, m = TRUE, a = TRUE),
+    "no duplicate ID"
+  )
+  expect_equal(rownames(res), c("s1", "s2", "s3"))
+  expect_equal(colnames(res), c("HOST", "COUNTRY", "ANNEE", "MOIS"))
+  expect_true(all(vapply(res, is.factor, logical(1))))
+  expect_equal(as.character(res$HOST), c("pig", "unknown", "cattle"))
+  expect_equal(as.character(res$ANNEE), c("2020", "2021", "2021"))
+  expect_equal(as.character(res$MOIS), c("01", "03", "12"))
+  expect_silent(suppressMessages(prepare_input(raw, col_select = 2:4, id = 1, date = 3)))
+  res_year <- suppressMessages(prepare_input(raw, col_select = 2:4, id = 1, date = 3))
+  expect_equal(colnames(res_year), c("HOST", "COUNTRY", "ANNEE"))
 })
 ```
 
@@ -154,6 +173,26 @@ prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
 assess_gower(prepared_data, graph = TRUE)
 ```
 
+```{r tests-assess_gower}
+test_that("assess_gower returns a Gower distance and a complete-linkage tree", {
+  clean_data <- data.frame(
+    HOST = factor(c("pig", "pig", "cattle", "cattle")),
+    COUNTRY = factor(c("FR", "FR", "FR", "IT")),
+    row.names = c("s1", "s2", "s3", "s4")
+  )
+  res <- assess_gower(clean_data, graph = FALSE)
+  expect_named(res, c("gower_dist", "aggl.clust.c"))
+  expect_s3_class(res$gower_dist, "dist")
+  expect_s3_class(res$aggl.clust.c, "hclust")
+  d <- as.matrix(res$gower_dist)
+  expect_equal(d["s1", "s2"], 0)
+  expect_equal(d["s1", "s3"], 0.5)
+  expect_equal(d["s1", "s4"], 1)
+  weighted <- as.matrix(assess_gower(clean_data, weights = c(3, 1), graph = FALSE)$gower_dist)
+  expect_equal(weighted["s1", "s3"], 0.75)
+})
+```
+
 # cstats_table function
 
 ```{=html}
@@ -194,7 +233,7 @@ cstats_table <- function(dist, tree, k,l, graph_silhouette =TRUE) {
        row.clust[i] <- paste("Cluster-", i*l, " size")
    }
     for(i in 1:n){
-     print(i*l)
+     message("testing ", i*l, " clusters")
      stats.names[i] <- paste("Test", i*l)
      stats_i <- cluster.stats(d = dist, clustering = cutree(tree, k = i*l))
 
@@ -245,17 +284,19 @@ cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c, k = 50,l = 10)
 test_that("cstats_table returns the cluster stats table", {
   datafile <- system.file("data_test.csv", package = "strainselect")
   raw_data <- read.csv(datafile, sep = ";", header = TRUE)
-  capture.output(
-    prepared_data <- prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  prepared_data <- suppressMessages(
+    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
   )
   gower <- assess_gower(prepared_data, graph = FALSE)
-  capture.output(
+  expect_message(
     stats <- cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, l = 10,
-                          graph_silhouette = FALSE)
+                          graph_silhouette = FALSE),
+    "testing 10 clusters"
   )
   expect_s3_class(stats, "data.frame")
   expect_equal(nrow(stats), 3)
   expect_equal(stats$cluster.number, c(10, 20, 30))
+  expect_true(all(stats$avg.silwidth >= -1 & stats$avg.silwidth <= 1))
   expect_error(cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 25, l = 10),
                "multiple")
 })
@@ -280,39 +321,40 @@ This function return a data frame with for each strain, its characteristics, its
 #' @param isdiss logical value specifying wether x is a dissimilarity matrix
 #' @param hc_func the hierarchical clustering function to be used
 #' @param hc_method he agglomeration method to be used
+#' @param seed an integer passed to set.seed() to make the choice between
+#'   ex aequo strains reproducible, or NULL (default) to leave the random
+#'   number generator untouched
 #'
 #' @return a data frame
 #' @export
-#' @importFrom factoextra hcut fviz_silhouette
+#' @importFrom factoextra hcut
 #'
 #' @examples
- select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(dist, "dist"),
-                               hc_func = "hclust", hc_method = "complete") {
-   clust2 <- hcut(dist, k, isdiss,hc_func, hc_method)
-   silh <- fviz_silhouette(clust2)
-   selected_data <- prepared_data
-   selected_data$cluster <- clust2$cluster
-   n=nrow(selected_data)
-   selection <- rep(NA,k)
-   for(i in 1:k){
-     max_silh_i <- silh$data[which(silh$data$sil_width==max(silh$data$sil_width[silh$data$cluster==i])&silh$data$cluster==i),]
-     if (nrow(max_silh_i)==1){
-       selection[i] <- as.character(max_silh_i$name)
-     } else {
-       selection[i] <- as.character(sample(max_silh_i$name,1))
-     } 
-   }
-   for (i in 1:n){
-     for (j in 1:k){
-       if (selected_data$cluster[i]==j){
-         selected_data$size[i] <- clust2$size[j]
-         selected_data$selected[i] <- selection[j]
-         
-       }
-     }
-   }
-   selected_data
- }
+select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(dist, "dist"),
+                               hc_func = "hclust", hc_method = "complete", seed = NULL) {
+  n <- nrow(prepared_data)
+  if (k < 2 || k >= n) {
+    stop("k must be between 2 and the number of strains minus 1")
+  }
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+  clust2 <- hcut(dist, k, isdiss, hc_func, hc_method)
+  widths <- clust2$silinfo$widths
+  selection <- vapply(seq_len(k), function(i) {
+    widths_i <- widths[widths$cluster == i, , drop = FALSE]
+    best <- rownames(widths_i)[widths_i$sil_width == max(widths_i$sil_width)]
+    if (length(best) > 1) {
+      best <- best[sample.int(length(best), 1)]
+    }
+    best
+  }, character(1))
+  selected_data <- prepared_data
+  selected_data$cluster <- unname(clust2$cluster)
+  selected_data$size <- clust2$size[clust2$cluster]
+  selected_data$selected <- selection[clust2$cluster]
+  selected_data
+}
 ```
 
 ```{r examples-select_silhouette}
@@ -329,14 +371,31 @@ select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, hc_
 test_that("select_silhouette selects one strain per cluster without global objects", {
   datafile <- system.file("data_test.csv", package = "strainselect")
   raw_data <- read.csv(datafile, sep = ";", header = TRUE)
-  capture.output(
-    prepared_data <- prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  prepared_data <- suppressMessages(
+    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
   )
   dist <- assess_gower(prepared_data, graph = FALSE)$gower_dist
-  capture.output(selected <- select_silhouette(prepared_data, dist, k = 10))
+  selected <- select_silhouette(prepared_data, dist, k = 10)
   expect_equal(nrow(selected), nrow(prepared_data))
   expect_true(all(c("cluster", "size", "selected") %in% colnames(selected)))
   expect_equal(length(unique(selected$selected)), 10)
+  # each selected strain belongs to the cluster it represents
+  expect_equal(selected[selected$selected, "cluster"], selected$cluster)
+  # size is the number of strains in the cluster
+  expect_equal(selected$size, as.vector(table(selected$cluster)[as.character(selected$cluster)]))
+})
+
+test_that("select_silhouette is reproducible with seed and checks k", {
+  datafile <- system.file("data_test.csv", package = "strainselect")
+  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+  prepared_data <- suppressMessages(
+    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  )
+  dist <- assess_gower(prepared_data, graph = FALSE)$gower_dist
+  expect_identical(select_silhouette(prepared_data, dist, k = 20, seed = 42),
+                   select_silhouette(prepared_data, dist, k = 20, seed = 42))
+  expect_error(select_silhouette(prepared_data, dist, k = 1), "k must be")
+  expect_error(select_silhouette(prepared_data, dist, k = nrow(prepared_data)), "k must be")
 })
 ```
 
@@ -357,26 +416,17 @@ The prepare_upset allows to prepare the dataframe used to visualize the interact
 #'
 #' @examples
 prepare_upset<- function(prepared_data){
- upset_data <- data.frame(row.names = rownames(prepared_data))
- metadata <- colnames(prepared_data)
- for (i in 1:ncol(prepared_data)){
-   vect <- unique(prepared_data[,i])
-   tab <- matrix(0,nrow(prepared_data),length(vect))
-   col.names <- NULL
-   for (j in 1:length(vect)){
-     col.names <- c(col.names,paste(metadata[i],"_",vect[j]))
-     for (k in 1:nrow(prepared_data)){
-       if (!is.na(prepared_data[k,i])){
-         if(prepared_data[k,i]==vect[j]){
-           tab[k,j] <- 1
-         }
-       }
-     }
-   }
-   colnames(tab) <- col.names
-   upset_data <- cbind(upset_data,tab)
- } 
- upset_data
+  upset_data <- data.frame(row.names = rownames(prepared_data))
+  metadata <- colnames(prepared_data)
+  for (i in seq_along(prepared_data)){
+    x <- as.character(prepared_data[[i]])
+    vect <- unique(prepared_data[[i]])
+    tab <- 1 * outer(x, as.character(vect), "==")
+    tab[is.na(tab)] <- 0
+    colnames(tab) <- paste(metadata[i], "_", vect)
+    upset_data <- cbind(upset_data, tab)
+  }
+  upset_data
 }
 
 ```
@@ -389,6 +439,24 @@ prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
 # Apply my function
 prepare_upset(prepared_data)
+```
+
+```{r tests-prepare_upset}
+test_that("prepare_upset builds a binary table with one column per modality", {
+  prepared_data <- data.frame(
+    HOST = factor(c("pig", "cattle", "pig")),
+    COUNTRY = factor(c("FR", "FR", "IT")),
+    row.names = c("s1", "s2", "s3")
+  )
+  upset <- prepare_upset(prepared_data)
+  expect_equal(rownames(upset), c("s1", "s2", "s3"))
+  expect_equal(colnames(upset),
+               c("HOST _ pig", "HOST _ cattle", "COUNTRY _ FR", "COUNTRY _ IT"))
+  expect_equal(upset[["HOST _ pig"]], c(1, 0, 1))
+  expect_equal(upset[["COUNTRY _ IT"]], c(0, 0, 1))
+  # each strain has exactly one modality per metadata
+  expect_true(all(rowSums(upset) == ncol(prepared_data)))
+})
 ```
 
 # define_profile function
@@ -407,25 +475,15 @@ Strain are grouped by identical profiles which allows to consider also the strai
 #'
 #' @return a data frame
 #' @export
-#' @importFrom tidyr unite
 #'
 #' @examples
 define_profiles <- function (data, sep = ""){
-  profiles <- unite(data,"profiles",c(1:ncol(data)), sep = sep)
-  profiles_freq <- as.data.frame(table(profiles))
-  profiles_freq$group <- c(1:nrow(profiles_freq))
-  n=nrow(profiles)
-  for (i in 1:n){
-    for (j in 1:nrow(profiles_freq)){
-      if (profiles$profiles[i]==profiles_freq$profiles[j]){
-        profiles$group[i]<-profiles_freq$group[j]
-      }
-    }
-  }
-  profiles$names<-rownames(profiles)
-  
+  profiles <- data.frame(profiles = do.call(paste, c(unname(as.list(data)), sep = sep)),
+                         row.names = rownames(data))
+  profiles$group <- as.integer(factor(profiles$profiles))
+  profiles$names <- rownames(profiles)
   profiles
-} 
+}
 ```
 
 ```{r examples-define_profile}
@@ -437,6 +495,24 @@ prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
 upset_data <- prepare_upset(prepared_data)
 # Apply my function
 define_profiles(upset_data)
+```
+
+```{r tests-define_profiles}
+test_that("define_profiles gives the same group to identical profiles", {
+  upset <- data.frame(
+    A = c(1, 1, 0, 1),
+    B = c(0, 0, 1, 0),
+    C = c(1, 1, 1, 0),
+    row.names = c("s1", "s2", "s3", "s4")
+  )
+  profiles <- define_profiles(upset)
+  expect_equal(colnames(profiles), c("profiles", "group", "names"))
+  expect_equal(profiles$profiles, c("101", "101", "011", "100"))
+  expect_equal(profiles$names, c("s1", "s2", "s3", "s4"))
+  expect_equal(profiles$group[1], profiles$group[2])
+  expect_equal(length(unique(profiles$group)), 3)
+  expect_equal(define_profiles(upset, sep = "-")$profiles[1], "1-0-1")
+})
 ```
 
 # select_profiles function
@@ -451,28 +527,24 @@ Because the define_profiles function groups strains by identical profile, select
 #'
 #' @param profiles a data frame
 #' @param prepared_data a data frame
+#' @param seed an integer passed to set.seed() to make the random choice of
+#'   the representative strains reproducible, or NULL (default) to leave the
+#'   random number generator untouched
 #'
 #' @return a data frame
 #' @export
 #'
 #' @examples
-select_profiles <- function(profiles, prepared_data){
+select_profiles <- function(profiles, prepared_data, seed = NULL){
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   selected_data <- prepared_data
   selected_data$group <- profiles$group
   selected_data$size <- as.vector(table(profiles$group)[as.character(profiles$group)])
-  k<- max(profiles$group)
-  n=nrow(selected_data)
-  selection <-rep(NA,k)
-  for (j in 1:k){
-      selection[j] <-sample(profiles$names[profiles$group==j],1)
-  }
-  for (i in 1:n){
-    for (j in 1:k){
-      if (selected_data$group[i]==j){
-        selected_data$selected[i] <- selection[j]
-      }
-    }
-  }
+  selection <- vapply(split(profiles$names, profiles$group),
+                      function(x) x[sample.int(length(x), 1)], character(1))
+  selected_data$selected <- unname(selection[as.character(profiles$group)])
   selected_data
 }
 ```
@@ -493,8 +565,8 @@ select_profiles(upset_profiles,prepared_data)
 test_that("define_profiles and select_profiles select one strain per profile", {
   datafile <- system.file("data_test.csv", package = "strainselect")
   raw_data <- read.csv(datafile, sep = ";", header = TRUE)
-  capture.output(
-    prepared_data <- prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  prepared_data <- suppressMessages(
+    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
   )
   profiles <- define_profiles(prepare_upset(prepared_data))
   n_groups <- length(unique(profiles$profiles))
@@ -502,6 +574,10 @@ test_that("define_profiles and select_profiles select one strain per profile", {
   selected <- select_profiles(profiles, prepared_data)
   expect_equal(length(unique(selected$selected)), n_groups)
   expect_equal(sum(selected$size[!duplicated(selected$group)]), nrow(prepared_data))
+  # each selected strain has the profile of the group it represents
+  expect_equal(profiles[selected$selected, "group"], selected$group)
+  expect_identical(select_profiles(profiles, prepared_data, seed = 1),
+                   select_profiles(profiles, prepared_data, seed = 1))
 })
 ```
 

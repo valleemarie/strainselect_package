@@ -39,7 +39,7 @@ cstats_table <- function(dist, tree, k,l, graph_silhouette =TRUE) {
        row.clust[i] <- paste("Cluster-", i*l, " size")
    }
     for(i in 1:n){
-     print(i*l)
+     message("testing ", i*l, " clusters")
      stats.names[i] <- paste("Test", i*l)
      stats_i <- cluster.stats(d = dist, clustering = cutree(tree, k = i*l))
 

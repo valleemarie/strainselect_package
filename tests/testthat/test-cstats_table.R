@@ -3,17 +3,19 @@
 test_that("cstats_table returns the cluster stats table", {
   datafile <- system.file("data_test.csv", package = "strainselect")
   raw_data <- read.csv(datafile, sep = ";", header = TRUE)
-  capture.output(
-    prepared_data <- prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  prepared_data <- suppressMessages(
+    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
   )
   gower <- assess_gower(prepared_data, graph = FALSE)
-  capture.output(
+  expect_message(
     stats <- cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, l = 10,
-                          graph_silhouette = FALSE)
+                          graph_silhouette = FALSE),
+    "testing 10 clusters"
   )
   expect_s3_class(stats, "data.frame")
   expect_equal(nrow(stats), 3)
   expect_equal(stats$cluster.number, c(10, 20, 30))
+  expect_true(all(stats$avg.silwidth >= -1 & stats$avg.silwidth <= 1))
   expect_error(cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 25, l = 10),
                "multiple")
 })

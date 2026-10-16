@@ -4,6 +4,9 @@
 #'
 #' @param profiles a data frame
 #' @param prepared_data a data frame
+#' @param seed an integer passed to set.seed() to make the random choice of
+#'   the representative strains reproducible, or NULL (default) to leave the
+#'   random number generator untouched
 #'
 #' @return a data frame
 #' @export
@@ -18,22 +21,15 @@
 #' upset_profiles <- define_profiles(upset_data)
 #' # Apply my function
 #' select_profiles(upset_profiles,prepared_data)
-select_profiles <- function(profiles, prepared_data){
+select_profiles <- function(profiles, prepared_data, seed = NULL){
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   selected_data <- prepared_data
   selected_data$group <- profiles$group
   selected_data$size <- as.vector(table(profiles$group)[as.character(profiles$group)])
-  k<- max(profiles$group)
-  n=nrow(selected_data)
-  selection <-rep(NA,k)
-  for (j in 1:k){
-      selection[j] <-sample(profiles$names[profiles$group==j],1)
-  }
-  for (i in 1:n){
-    for (j in 1:k){
-      if (selected_data$group[i]==j){
-        selected_data$selected[i] <- selection[j]
-      }
-    }
-  }
+  selection <- vapply(split(profiles$names, profiles$group),
+                      function(x) x[sample.int(length(x), 1)], character(1))
+  selected_data$selected <- unname(selection[as.character(profiles$group)])
   selected_data
 }

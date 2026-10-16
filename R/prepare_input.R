@@ -11,7 +11,6 @@
 #'
 #' @return a dataframe
 #' @export
-#' @importFrom utils str
 #' @examples
 #' 
 #' # Example with your dataset in "inst/"
@@ -26,7 +25,7 @@ prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
   if (length(duplicate)!=0) {
     stop ( "duplicate ID : " , paste(data[duplicate,id], collapse = ", "))
   } else {
-    print("no duplicate ID")
+    message("no duplicate ID")
   }
   rownames(data) <- data[,id]
   col_select<-col_select[! col_select %in% date]
@@ -41,7 +40,6 @@ prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
   }
   clean_data[is.na(clean_data)] <- "unknown"
   clean_data[] <- lapply(clean_data, factor)
-  print(colnames(clean_data))
-  str(clean_data)
+  message("selected metadata: ", paste(colnames(clean_data), collapse = ", "))
   clean_data
 }

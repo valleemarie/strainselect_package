@@ -10,7 +10,8 @@ select_silhouette(
   k,
   isdiss = inherits(dist, "dist"),
   hc_func = "hclust",
-  hc_method = "complete"
+  hc_method = "complete",
+  seed = NULL
 )
 }
 \arguments{
@@ -25,6 +26,10 @@ select_silhouette(
 \item{hc_func}{the hierarchical clustering function to be used}
 
 \item{hc_method}{he agglomeration method to be used}
+
+\item{seed}{an integer passed to set.seed() to make the choice between
+ex aequo strains reproducible, or NULL (default) to leave the random
+number generator untouched}
 }
 \value{
 a data frame

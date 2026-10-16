@@ -8,10 +8,13 @@
 #' @param isdiss logical value specifying wether x is a dissimilarity matrix
 #' @param hc_func the hierarchical clustering function to be used
 #' @param hc_method he agglomeration method to be used
+#' @param seed an integer passed to set.seed() to make the choice between
+#'   ex aequo strains reproducible, or NULL (default) to leave the random
+#'   number generator untouched
 #'
 #' @return a data frame
 #' @export
-#' @importFrom factoextra hcut fviz_silhouette
+#' @importFrom factoextra hcut
 #'
 #' @examples
 #' datafile <- system.file("data_test.csv", package = "strainselect")
@@ -21,30 +24,28 @@
 #' gower <- assess_gower(prepared_data, graph = TRUE)
 #' 
 #' select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, hc_func = "hclust", hc_method = "complete")
- select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(dist, "dist"),
-                               hc_func = "hclust", hc_method = "complete") {
-   clust2 <- hcut(dist, k, isdiss,hc_func, hc_method)
-   silh <- fviz_silhouette(clust2)
-   selected_data <- prepared_data
-   selected_data$cluster <- clust2$cluster
-   n=nrow(selected_data)
-   selection <- rep(NA,k)
-   for(i in 1:k){
-     max_silh_i <- silh$data[which(silh$data$sil_width==max(silh$data$sil_width[silh$data$cluster==i])&silh$data$cluster==i),]
-     if (nrow(max_silh_i)==1){
-       selection[i] <- as.character(max_silh_i$name)
-     } else {
-       selection[i] <- as.character(sample(max_silh_i$name,1))
-     } 
-   }
-   for (i in 1:n){
-     for (j in 1:k){
-       if (selected_data$cluster[i]==j){
-         selected_data$size[i] <- clust2$size[j]
-         selected_data$selected[i] <- selection[j]
-         
-       }
-     }
-   }
-   selected_data
- }
+select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(dist, "dist"),
+                               hc_func = "hclust", hc_method = "complete", seed = NULL) {
+  n <- nrow(prepared_data)
+  if (k < 2 || k >= n) {
+    stop("k must be between 2 and the number of strains minus 1")
+  }
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+  clust2 <- hcut(dist, k, isdiss, hc_func, hc_method)
+  widths <- clust2$silinfo$widths
+  selection <- vapply(seq_len(k), function(i) {
+    widths_i <- widths[widths$cluster == i, , drop = FALSE]
+    best <- rownames(widths_i)[widths_i$sil_width == max(widths_i$sil_width)]
+    if (length(best) > 1) {
+      best <- best[sample.int(length(best), 1)]
+    }
+    best
+  }, character(1))
+  selected_data <- prepared_data
+  selected_data$cluster <- unname(clust2$cluster)
+  selected_data$size <- clust2$size[clust2$cluster]
+  selected_data$selected <- selection[clust2$cluster]
+  selected_data
+}

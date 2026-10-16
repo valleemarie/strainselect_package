@@ -3,12 +3,29 @@
 test_that("select_silhouette selects one strain per cluster without global objects", {
   datafile <- system.file("data_test.csv", package = "strainselect")
   raw_data <- read.csv(datafile, sep = ";", header = TRUE)
-  capture.output(
-    prepared_data <- prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  prepared_data <- suppressMessages(
+    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
   )
   dist <- assess_gower(prepared_data, graph = FALSE)$gower_dist
-  capture.output(selected <- select_silhouette(prepared_data, dist, k = 10))
+  selected <- select_silhouette(prepared_data, dist, k = 10)
   expect_equal(nrow(selected), nrow(prepared_data))
   expect_true(all(c("cluster", "size", "selected") %in% colnames(selected)))
   expect_equal(length(unique(selected$selected)), 10)
+  # each selected strain belongs to the cluster it represents
+  expect_equal(selected[selected$selected, "cluster"], selected$cluster)
+  # size is the number of strains in the cluster
+  expect_equal(selected$size, as.vector(table(selected$cluster)[as.character(selected$cluster)]))
+})
+
+test_that("select_silhouette is reproducible with seed and checks k", {
+  datafile <- system.file("data_test.csv", package = "strainselect")
+  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+  prepared_data <- suppressMessages(
+    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  )
+  dist <- assess_gower(prepared_data, graph = FALSE)$gower_dist
+  expect_identical(select_silhouette(prepared_data, dist, k = 20, seed = 42),
+                   select_silhouette(prepared_data, dist, k = 20, seed = 42))
+  expect_error(select_silhouette(prepared_data, dist, k = 1), "k must be")
+  expect_error(select_silhouette(prepared_data, dist, k = nrow(prepared_data)), "k must be")
 })
