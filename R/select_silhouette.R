@@ -11,16 +11,17 @@
 #'
 #' @return a data frame
 #' @export
+#' @importFrom factoextra hcut fviz_silhouette
 #'
 #' @examples
 #' datafile <- system.file("data_test.csv", package = "strainselect")
-#' raw_data <- read.csv(datafile, sep = ";",header = T)
-#' gower <- assess_gower(prepared_data, graph = T)
+#' raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 #' prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
 #'               id=1,date=17,m=FALSE,a=TRUE)
+#' gower <- assess_gower(prepared_data, graph = TRUE)
 #' 
-#'  select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, isdiss = inherits(gower$gower_dist, "dist"),hc_func = "hclust", hc_method = "complete")
- select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(gower$gower_dist, "dist"),
+#' select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, hc_func = "hclust", hc_method = "complete")
+ select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(dist, "dist"),
                                hc_func = "hclust", hc_method = "complete") {
    clust2 <- hcut(dist, k, isdiss,hc_func, hc_method)
    silh <- fviz_silhouette(clust2)

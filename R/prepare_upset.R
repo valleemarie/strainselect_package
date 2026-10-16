@@ -10,7 +10,7 @@
 #' @examples
 #' # Example with your dataset in "inst/"
 #' datafile <- system.file("data_test.csv", package = "strainselect")
-#' raw_data <- read.csv(datafile, sep = ";",header = T)
+#' raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 #' prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
 #'               id=1,date=17,m=FALSE,a=TRUE)
 #' # Apply my function
@@ -25,7 +25,7 @@ prepare_upset<- function(prepared_data){
    for (j in 1:length(vect)){
      col.names <- c(col.names,paste(metadata[i],"_",vect[j]))
      for (k in 1:nrow(prepared_data)){
-       if (is.na(prepared_data[k,i])==F){
+       if (!is.na(prepared_data[k,i])){
          if(prepared_data[k,i]==vect[j]){
            tab[k,j] <- 1
          }

@@ -4,3 +4,5 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^strainselect\.Rproj$
+^How_to_use_Strainselect$
+^\.Rhistory$

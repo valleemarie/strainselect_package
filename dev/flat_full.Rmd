@@ -36,7 +36,7 @@ pkgload::load_all(export_all = FALSE)
 pkgload::load_all(path = here::here(), export_all = FALSE)
 
 datafile <- system.file("data_test.csv", package = "strainselect")
-row_data <- read.csv(datafile, sep = ";",header = T)
+row_data <- read.csv(datafile, sep = ";",header = TRUE)
 
 row_data
 ```
@@ -62,6 +62,7 @@ The user can choose to extract the month or the year or both data from the date 
 #'
 #' @return a dataframe
 #' @export
+#' @importFrom utils str
 #' @examples
 prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
                            m=FALSE, a=TRUE) {
@@ -94,7 +95,7 @@ prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
 
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 # Apply my function
 prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
@@ -129,6 +130,7 @@ The dendrogram resulting from the hierarchical cluster analysis is plotted if gr
 #' @return a list containing the components clean_data, gower_dist, aggl.clust.c
 #' @export
 #' @importFrom cluster daisy
+#' @importFrom stats hclust
 #'
 #' @examples
 assess_gower <- function(clean_data, weights = rep.int(1, p), graph = TRUE){
@@ -145,11 +147,11 @@ assess_gower <- function(clean_data, weights = rep.int(1, p), graph = TRUE){
 ```{r examples-assess_gower}
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
 # Apply my function
-assess_gower(prepared_data, graph = T)
+assess_gower(prepared_data, graph = TRUE)
 ```
 
 # cstats_table function
@@ -169,11 +171,17 @@ The user enters a distance object and a dendogram object resulting from the func
 #' @param l a number
 #' @param graph_silhouette a boolean
 #'
-#' @return a dataframe
+#' @return a dataframe with one row per number of clusters tested
 #' @export
+#' @importFrom fpc cluster.stats
+#' @importFrom stats cutree
+#' @importFrom ggplot2 ggplot aes .data geom_point geom_line ggtitle labs theme element_text
 #'
 #' @examples
-cstats_table <- function(dist, tree, k,l, graph_silhouette =T) {
+cstats_table <- function(dist, tree, k,l, graph_silhouette =TRUE) {
+   if (k %% l != 0) {
+     stop("k must be a multiple of l")
+   }
    n=k/l
    clust.assess <- c("cluster.number","n","within.cluster.ss","average.within","average.between",
                      "wb.ratio","dunn2","avg.silwidth")
@@ -187,17 +195,15 @@ cstats_table <- function(dist, tree, k,l, graph_silhouette =T) {
    }
     for(i in 1:n){
      print(i*l)
-     stats.names[i] <- paste("Test", i*l-1)
-     
+     stats.names[i] <- paste("Test", i*l)
+     stats_i <- cluster.stats(d = dist, clustering = cutree(tree, k = i*l))
+
      for(j in seq_along(clust.assess)){
-       output.stats[j, i] <- unlist(cluster.stats(d = dist, clustering = cutree(tree, k = i*l))[clust.assess])[j]
-       
+       output.stats[j, i] <- unlist(stats_i[clust.assess])[j]
      }
-     
+
      for(d in 1:n) {
-       cluster.sizes[d, i] <- unlist(cluster.stats(d = dist, clustering = cutree(tree, k = i*l))[clust.size])[d*l]
-       dim(cluster.sizes[d, i]) <- c(length(cluster.sizes[i]), 1)
-       cluster.sizes[d, i]
+       cluster.sizes[d, i] <- unlist(stats_i[clust.size])[d*l]
      }
    }
    output.stats.df <- data.frame(output.stats)
@@ -212,24 +218,47 @@ cstats_table <- function(dist, tree, k,l, graph_silhouette =T) {
    output[is.num] <- lapply(output[is.num], round, 2)
    data_fig <- data.frame(t(output))
    if (graph_silhouette){
-     ggplot(data = data_fig, 
-            aes(x=cluster.number, y=avg.silwidth)) + 
+     print(ggplot(data = data_fig,
+            aes(x=.data$cluster.number, y=.data$avg.silwidth)) +
        geom_point()+
        geom_line()+
        ggtitle("Agglomerative clustering") +
        labs(x = "Num.of clusters", y = "Average silhouette width") +
-       theme(plot.title = element_text(hjust = 0.5)) 
+       theme(plot.title = element_text(hjust = 0.5)))
    }
+   data_fig
  }
 ```
 
 ```{r examples-cstats_table}
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
-gower <- assess_gower(prepared_data, graph = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
+prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
+              id=1,date=17,m=FALSE,a=TRUE)
+gower <- assess_gower(prepared_data, graph = TRUE)
 # Apply my function
 cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c, k = 50,l = 10)
+```
+
+```{r tests-cstats_table}
+test_that("cstats_table returns the cluster stats table", {
+  datafile <- system.file("data_test.csv", package = "strainselect")
+  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+  capture.output(
+    prepared_data <- prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  )
+  gower <- assess_gower(prepared_data, graph = FALSE)
+  capture.output(
+    stats <- cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, l = 10,
+                          graph_silhouette = FALSE)
+  )
+  expect_s3_class(stats, "data.frame")
+  expect_equal(nrow(stats), 3)
+  expect_equal(stats$cluster.number, c(10, 20, 30))
+  expect_error(cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 25, l = 10),
+               "multiple")
+})
 ```
 
 # select_silhouette function
@@ -254,9 +283,10 @@ This function return a data frame with for each strain, its characteristics, its
 #'
 #' @return a data frame
 #' @export
+#' @importFrom factoextra hcut fviz_silhouette
 #'
 #' @examples
- select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(gower$gower_dist, "dist"),
+ select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(dist, "dist"),
                                hc_func = "hclust", hc_method = "complete") {
    clust2 <- hcut(dist, k, isdiss,hc_func, hc_method)
    silh <- fviz_silhouette(clust2)
@@ -287,12 +317,27 @@ This function return a data frame with for each strain, its characteristics, its
 
 ```{r examples-select_silhouette}
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
-gower <- assess_gower(prepared_data, graph = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
+gower <- assess_gower(prepared_data, graph = TRUE)
 
- select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, isdiss = inherits(gower$gower_dist, "dist"),hc_func = "hclust", hc_method = "complete")
+select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, hc_func = "hclust", hc_method = "complete")
+```
+
+```{r tests-select_silhouette}
+test_that("select_silhouette selects one strain per cluster without global objects", {
+  datafile <- system.file("data_test.csv", package = "strainselect")
+  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+  capture.output(
+    prepared_data <- prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  )
+  dist <- assess_gower(prepared_data, graph = FALSE)$gower_dist
+  capture.output(selected <- select_silhouette(prepared_data, dist, k = 10))
+  expect_equal(nrow(selected), nrow(prepared_data))
+  expect_true(all(c("cluster", "size", "selected") %in% colnames(selected)))
+  expect_equal(length(unique(selected$selected)), 10)
+})
 ```
 
 # prepare_upset function
@@ -321,7 +366,7 @@ prepare_upset<- function(prepared_data){
    for (j in 1:length(vect)){
      col.names <- c(col.names,paste(metadata[i],"_",vect[j]))
      for (k in 1:nrow(prepared_data)){
-       if (is.na(prepared_data[k,i])==F){
+       if (!is.na(prepared_data[k,i])){
          if(prepared_data[k,i]==vect[j]){
            tab[k,j] <- 1
          }
@@ -339,7 +384,7 @@ prepare_upset<- function(prepared_data){
 ```{r examples-prepare_upset}
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
 # Apply my function
@@ -362,10 +407,11 @@ Strain are grouped by identical profiles which allows to consider also the strai
 #'
 #' @return a data frame
 #' @export
+#' @importFrom tidyr unite
 #'
 #' @examples
 define_profiles <- function (data, sep = ""){
-  profiles <- unite(data,profiles,c(1:ncol(upset_data)), sep = sep)
+  profiles <- unite(data,"profiles",c(1:ncol(data)), sep = sep)
   profiles_freq <- as.data.frame(table(profiles))
   profiles_freq$group <- c(1:nrow(profiles_freq))
   n=nrow(profiles)
@@ -385,7 +431,7 @@ define_profiles <- function (data, sep = ""){
 ```{r examples-define_profile}
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
 upset_data <- prepare_upset(prepared_data)
@@ -413,7 +459,7 @@ Because the define_profiles function groups strains by identical profile, select
 select_profiles <- function(profiles, prepared_data){
   selected_data <- prepared_data
   selected_data$group <- profiles$group
-  selected_data$size <- profiles$freq
+  selected_data$size <- as.vector(table(profiles$group)[as.character(profiles$group)])
   k<- max(profiles$group)
   n=nrow(selected_data)
   selection <-rep(NA,k)
@@ -434,13 +480,29 @@ select_profiles <- function(profiles, prepared_data){
 ```{r examples-select_profile}
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
 upset_data <- prepare_upset(prepared_data)
 upset_profiles <- define_profiles(upset_data)
 # Apply my function
 select_profiles(upset_profiles,prepared_data)
+```
+
+```{r tests-select_profiles}
+test_that("define_profiles and select_profiles select one strain per profile", {
+  datafile <- system.file("data_test.csv", package = "strainselect")
+  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+  capture.output(
+    prepared_data <- prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  )
+  profiles <- define_profiles(prepare_upset(prepared_data))
+  n_groups <- length(unique(profiles$profiles))
+  expect_equal(max(profiles$group), n_groups)
+  selected <- select_profiles(profiles, prepared_data)
+  expect_equal(length(unique(selected$selected)), n_groups)
+  expect_equal(sum(selected$size[!duplicated(selected$group)]), nrow(prepared_data))
+})
 ```
 
 ```{r development-inflate, eval=FALSE}

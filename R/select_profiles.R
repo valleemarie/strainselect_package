@@ -11,7 +11,7 @@
 #' @examples
 #' # Example with your dataset in "inst/"
 #' datafile <- system.file("data_test.csv", package = "strainselect")
-#' raw_data <- read.csv(datafile, sep = ";",header = T)
+#' raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 #' prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
 #'               id=1,date=17,m=FALSE,a=TRUE)
 #' upset_data <- prepare_upset(prepared_data)
@@ -21,7 +21,7 @@
 select_profiles <- function(profiles, prepared_data){
   selected_data <- prepared_data
   selected_data$group <- profiles$group
-  selected_data$size <- profiles$freq
+  selected_data$size <- as.vector(table(profiles$group)[as.character(profiles$group)])
   k<- max(profiles$group)
   n=nrow(selected_data)
   selection <-rep(NA,k)

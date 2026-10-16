@@ -9,15 +9,16 @@
 #' @return a list containing the components clean_data, gower_dist, aggl.clust.c
 #' @export
 #' @importFrom cluster daisy
+#' @importFrom stats hclust
 #'
 #' @examples
 #' # Example with your dataset in "inst/"
 #' datafile <- system.file("data_test.csv", package = "strainselect")
-#' raw_data <- read.csv(datafile, sep = ";",header = T)
+#' raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 #' prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
 #'               id=1,date=17,m=FALSE,a=TRUE)
 #' # Apply my function
-#' assess_gower(prepared_data, graph = T)
+#' assess_gower(prepared_data, graph = TRUE)
 assess_gower <- function(clean_data, weights = rep.int(1, p), graph = TRUE){
   p=length(clean_data)
   gower_dist <- daisy(clean_data, metric = "gower", weights = weights)
