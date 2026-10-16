@@ -41,7 +41,7 @@ The user can choose to extract the month or the year or both data from the date 
 
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 # Apply my function
 prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
@@ -61,11 +61,11 @@ The dendrogram resulting from the hierarchical cluster analysis is plotted if gr
 ```{r examples-assess_gower}
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
 # Apply my function
-assess_gower(prepared_data, graph = T)
+assess_gower(prepared_data, graph = TRUE)
 ```
 
 # cstats_table function
@@ -79,8 +79,10 @@ The user enters a distance object and a dendogram object resulting from the func
 ```{r examples-cstats_table}
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
-gower <- assess_gower(prepared_data, graph = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
+prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
+              id=1,date=17,m=FALSE,a=TRUE)
+gower <- assess_gower(prepared_data, graph = TRUE)
 # Apply my function
 cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c, k = 50,l = 10)
 ```
@@ -97,12 +99,12 @@ This function return a data frame with for each strain, its characteristics, its
 ```
 ```{r examples-select_silhouette}
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
-gower <- assess_gower(prepared_data, graph = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
+gower <- assess_gower(prepared_data, graph = TRUE)
 
- select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, isdiss = inherits(gower$gower_dist, "dist"),hc_func = "hclust", hc_method = "complete")
+select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, hc_func = "hclust", hc_method = "complete")
 ```
 
 # prepare_upset function
@@ -115,7 +117,7 @@ The prepare_upset allows to prepare the dataframe used to visualize the interact
 ```{r examples-prepare_upset}
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
 # Apply my function
@@ -133,7 +135,7 @@ Strain are grouped by identical profiles which allows to consider also the strai
 ```{r examples-define_profile}
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
 upset_data <- prepare_upset(prepared_data)
@@ -151,7 +153,7 @@ Because the define_profiles function groups strains by identical profile, select
 ```{r examples-select_profile}
 # Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
+raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
               id=1,date=17,m=FALSE,a=TRUE)
 upset_data <- prepare_upset(prepared_data)

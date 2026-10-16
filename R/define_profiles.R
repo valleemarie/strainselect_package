@@ -7,18 +7,19 @@
 #'
 #' @return a data frame
 #' @export
+#' @importFrom tidyr unite
 #'
 #' @examples
 #' # Example with your dataset in "inst/"
 #' datafile <- system.file("data_test.csv", package = "strainselect")
-#' raw_data <- read.csv(datafile, sep = ";",header = T)
+#' raw_data <- read.csv(datafile, sep = ";",header = TRUE)
 #' prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
 #'               id=1,date=17,m=FALSE,a=TRUE)
 #' upset_data <- prepare_upset(prepared_data)
 #' # Apply my function
 #' define_profiles(upset_data)
 define_profiles <- function (data, sep = ""){
-  profiles <- unite(data,profiles,c(1:ncol(upset_data)), sep = sep)
+  profiles <- unite(data,"profiles",c(1:ncol(data)), sep = sep)
   profiles_freq <- as.data.frame(table(profiles))
   profiles_freq$group <- c(1:nrow(profiles_freq))
   n=nrow(profiles)

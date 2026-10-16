@@ -8,17 +8,25 @@
 #' @param l a number
 #' @param graph_silhouette a boolean
 #'
-#' @return a dataframe
+#' @return a dataframe with one row per number of clusters tested
 #' @export
+#' @importFrom fpc cluster.stats
+#' @importFrom stats cutree
+#' @importFrom ggplot2 ggplot aes .data geom_point geom_line ggtitle labs theme element_text
 #'
 #' @examples
 #' # Example with your dataset in "inst/"
 #' datafile <- system.file("data_test.csv", package = "strainselect")
-#' raw_data <- read.csv(datafile, sep = ";",header = T)
-#' gower <- assess_gower(prepared_data, graph = T)
+#' raw_data <- read.csv(datafile, sep = ";",header = TRUE)
+#' prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
+#'               id=1,date=17,m=FALSE,a=TRUE)
+#' gower <- assess_gower(prepared_data, graph = TRUE)
 #' # Apply my function
 #' cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c, k = 50,l = 10)
-cstats_table <- function(dist, tree, k,l, graph_silhouette =T) {
+cstats_table <- function(dist, tree, k,l, graph_silhouette =TRUE) {
+   if (k %% l != 0) {
+     stop("k must be a multiple of l")
+   }
    n=k/l
    clust.assess <- c("cluster.number","n","within.cluster.ss","average.within","average.between",
                      "wb.ratio","dunn2","avg.silwidth")
@@ -32,17 +40,15 @@ cstats_table <- function(dist, tree, k,l, graph_silhouette =T) {
    }
     for(i in 1:n){
      print(i*l)
-     stats.names[i] <- paste("Test", i*l-1)
-     
+     stats.names[i] <- paste("Test", i*l)
+     stats_i <- cluster.stats(d = dist, clustering = cutree(tree, k = i*l))
+
      for(j in seq_along(clust.assess)){
-       output.stats[j, i] <- unlist(cluster.stats(d = dist, clustering = cutree(tree, k = i*l))[clust.assess])[j]
-       
+       output.stats[j, i] <- unlist(stats_i[clust.assess])[j]
      }
-     
+
      for(d in 1:n) {
-       cluster.sizes[d, i] <- unlist(cluster.stats(d = dist, clustering = cutree(tree, k = i*l))[clust.size])[d*l]
-       dim(cluster.sizes[d, i]) <- c(length(cluster.sizes[i]), 1)
-       cluster.sizes[d, i]
+       cluster.sizes[d, i] <- unlist(stats_i[clust.size])[d*l]
      }
    }
    output.stats.df <- data.frame(output.stats)
@@ -57,12 +63,13 @@ cstats_table <- function(dist, tree, k,l, graph_silhouette =T) {
    output[is.num] <- lapply(output[is.num], round, 2)
    data_fig <- data.frame(t(output))
    if (graph_silhouette){
-     ggplot(data = data_fig, 
-            aes(x=cluster.number, y=avg.silwidth)) + 
+     print(ggplot(data = data_fig,
+            aes(x=.data$cluster.number, y=.data$avg.silwidth)) +
        geom_point()+
        geom_line()+
        ggtitle("Agglomerative clustering") +
        labs(x = "Num.of clusters", y = "Average silhouette width") +
-       theme(plot.title = element_text(hjust = 0.5)) 
+       theme(plot.title = element_text(hjust = 0.5)))
    }
+   data_fig
  }
