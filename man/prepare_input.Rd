@@ -2,42 +2,71 @@
 % Please edit documentation in R/prepare_input.R
 \name{prepare_input}
 \alias{prepare_input}
-\title{prepare_input}
+\title{Prepare the metadata table used for strain selection}
 \usage{
 prepare_input(
   data,
-  col_select = c(1:length(data)),
+  col_select = seq_len(ncol(data)),
   id = 1,
-  date = 0,
-  m = FALSE,
-  a = TRUE
+  date = NULL,
+  month = FALSE,
+  year = TRUE,
+  date_format = "\%d/\%m/\%Y",
+  m,
+  a
 )
 }
 \arguments{
-\item{data}{a dataframe}
+\item{data}{A data frame (or a matrix) with one row per strain.}
 
-\item{col_select}{a vector}
+\item{col_select}{Names or positions of the metadata columns to keep. The
+identifier and date columns are always removed from this selection.
+Defaults to all columns.}
 
-\item{id}{a number}
+\item{id}{Name or position of the column containing the strain
+identifiers.}
 
-\item{date}{a number}
+\item{date}{Name or position of the date column, or \code{NULL} (default) if no
+date should be used. \code{0} is also accepted for "no date".}
 
-\item{m}{a boolean}
+\item{month}{If \code{TRUE}, a \code{MOIS} column with the month (\code{"01"} to \code{"12"})
+is created from the date column.}
 
-\item{a}{a boolean}
+\item{year}{If \code{TRUE} (default), an \code{ANNEE} column with the year is created
+from the date column.}
+
+\item{date_format}{Format of the dates, see \code{\link[=strptime]{strptime()}}. Defaults to
+\code{"\%d/\%m/\%Y"} (e.g. \code{09/01/2020}). Ignored when the date column is
+already of class \code{Date} or \code{POSIXt}.}
+
+\item{m, a}{Deprecated, use \code{month} and \code{year} instead.}
 }
 \value{
-a dataframe
+A data frame with one row per strain (row names are the strain
+identifiers) and one factor column per selected metadata, followed by
+\code{ANNEE} and/or \code{MOIS} when a date column is used. Dates that cannot be
+read give \code{"unknown"}.
 }
 \description{
-prepare_input
+Checks that strain identifiers are unique, keeps the metadata columns used
+for the selection, optionally extracts the year and/or the month from a
+date column, replaces missing values by \code{"unknown"} and converts every
+column to a factor.
 }
 \examples{
-
-# Example with your dataset in "inst/"
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-# Apply my function
-prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
+raw_data <- salmonella_strains
+prepared_data <- prepare_input(
+  raw_data,
+  col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT", month = FALSE, year = TRUE
+)
+head(prepared_data)
+# the same with column positions
+prepared_data <- prepare_input(raw_data, col_select = c(5, 8, 11, 12, 15, 22),
+                               id = 1, date = 15)
 }
+\seealso{
+Other data preparation: 
+\code{\link{salmonella_strains}}
+}
+\concept{data preparation}

@@ -1,8 +1,7 @@
 ---
-!---
 title: "flat_full.Rmd for working package"
 output: html_document
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
 
@@ -11,15 +10,6 @@ editor_options:
 <!-- Store every call to library() that you need to explore your functions -->
 
 ```{r development, include=FALSE}
-library(cluster) 
-library(fpc)
-library(ggplot2)
-library(dplyr)
-library(dendextend)
-library(UpSetR)
-library(nomclust)
-library(factoextra)
-library(tidyr)
 library(testthat)
 ```
 
@@ -28,107 +18,367 @@ library(testthat)
 pkgload::load_all(export_all = FALSE)
 ```
 
-# Data examples
+# Overview
 
-```{=html}
-```
-```{r development-dataset}
-pkgload::load_all(path = here::here(), export_all = FALSE)
+{strainselect} helps choosing which bacterial strains to sequence from a
+collection described by metadata (sampling context, matrix, region, sector,
+year...). It offers two complementary methods:
 
-datafile <- system.file("data_test.csv", package = "strainselect")
-row_data <- read.csv(datafile, sep = ";",header = TRUE)
+- the **clustering method** (`assess_gower()`, `cstats_table()`,
+  `select_silhouette()`) is suited when the number of strains that can be
+  sequenced is limited. Strains are grouped into *k* clusters of similar
+  strains and the best clustered strain of each cluster is selected, so that
+  the selected strains are as different as possible from each other;
+- the **profile method** (`prepare_upset()`, `define_profiles()`,
+  `select_profiles()`) is suited when the number of strains to sequence is
+  not limited. Strains sharing exactly the same metadata are grouped and one
+  strain per group is selected, so that every distinct profile — including
+  unique strains — is represented.
 
-row_data
-```
+Both methods start with `prepare_input()`, which cleans the raw table.
 
-# prepare_input function
+The examples below use `salmonella_strains`, a table of 100 *Salmonella*
+strains described by 22 variables, shipped with the package. The selection is
+based on 6 variables: `CONTEXTE`, `MATRICE1`, `REGION`, `SECTEUR`, `LIEUPVT`
+and the year extracted from `DATE_PRELEVEMENT`.
 
-```{=html}
-<!--
-Include a data table describing bacterial strains according to a number of metadata.
-The prepare_input function tests if the strain ID are all different and extracts the metadata selected by the user.
-The user can choose to extract the month or the year or both data from the date entered in the initial table.
--->
-```
-```{r function-prepare_input}
-#' prepare_input
+# Example data: salmonella_strains
+
+`salmonella_strains` is available as soon as the package is loaded. The same
+table is also shipped as a CSV file (`;` separator), which shows the expected
+format of an input file:
+`system.file("data_test.csv", package = "strainselect")`.
+
+```{r function-salmonella_strains}
+#' Example metadata of 100 *Salmonella* strains
 #'
-#' @param data a dataframe
-#' @param col_select a vector
-#' @param id a number
-#' @param date a number
-#' @param m a boolean
-#' @param a a boolean
+#' Metadata of 100 strains of *Salmonella enterica* serotype 1,4,\[5\],12:i:-
+#' (monophasic variant of Typhimurium) collected in France in 2020, used in the
+#' examples of the package. Column names and values are in French, as in the
+#' original database.
 #'
-#' @return a dataframe
-#' @export
-#' @importFrom utils str
+#' @format A data frame with 100 rows (one per strain) and 22 columns:
+#'   \describe{
+#'     \item{IDENTIFIANT}{strain identifier (unique);}
+#'     \item{SEROTYPE}{serotype of the strain;}
+#'     \item{COMMENTAIRE}{free-text description of the sample;}
+#'     \item{SAMPLETYPE}{type of sample;}
+#'     \item{CONTEXTE}{sampling context (surveillance, product alert,
+#'       control programme...);}
+#'     \item{PAYS}{country of sampling;}
+#'     \item{MATRICE}{sampled matrix, most detailed level;}
+#'     \item{MATRICE1}{sampled matrix, first level of grouping;}
+#'     \item{MATRICE2}{sampled matrix, second level of grouping;}
+#'     \item{NOM_DEPARTEMENT}{name of the French département of sampling;}
+#'     \item{REGION}{French region of sampling;}
+#'     \item{SECTEUR}{sector (human food, animal health and production,
+#'       ecosystem...);}
+#'     \item{NUMERO_DEPARTEMENT}{number of the French département;}
+#'     \item{CODE_POSTAL}{postal code of the place of sampling;}
+#'     \item{DATE_PRELEVEMENT}{date of sampling (`dd/mm/yyyy`);}
+#'     \item{DATE_RECEPTION}{date of reception at the laboratory
+#'       (`dd/mm/yyyy`);}
+#'     \item{TYPE_ANALYSE}{type of analysis;}
+#'     \item{ATYPIQUE}{flag for atypical strains;}
+#'     \item{TYPE_DE_DONNEES}{type of data;}
+#'     \item{BOX_NUMBER}{storage box of the strain;}
+#'     \item{EMPLACEMENT}{position of the strain in the box;}
+#'     \item{LIEUPVT}{place of sampling in the food chain (farm,
+#'       slaughterhouse, industrial processing...).}
+#'   }
+#' @source Example data provided by the authors. The same table is available
+#'   as a CSV file: `system.file("data_test.csv", package = "strainselect")`.
+#' @family data preparation
 #' @examples
-prepare_input <- function (data, col_select=c(1:length(data)), id =1, date=0,
-                           m=FALSE, a=TRUE) {
+"salmonella_strains"
+```
+
+```{r examples-salmonella_strains}
+str(salmonella_strains[, c("IDENTIFIANT", "CONTEXTE", "REGION", "DATE_PRELEVEMENT")])
+```
+
+```{r tests-salmonella_strains}
+test_that("salmonella_strains is the table of the CSV file", {
+  expect_equal(dim(salmonella_strains), c(100, 22))
+  datafile <- system.file("data_test.csv", package = "strainselect")
+  expect_equal(salmonella_strains, read.csv(datafile, sep = ";", header = TRUE,
+                                            encoding = "UTF-8"))
+  expect_false(anyDuplicated(salmonella_strains$IDENTIFIANT) > 0)
+})
+```
+
+# Preparing the data: prepare_input
+
+Before using any of the methods, the dataset must be cleaned and contain only
+the metadata on which the selection is based. `prepare_input()`:
+
+- checks that strain identifiers are unique (and stops with the list of
+  duplicated identifiers otherwise);
+- uses the identifiers as row names;
+- keeps only the selected metadata columns;
+- optionally extracts the year (`ANNEE`) and/or the month (`MOIS`) from a date
+  column;
+- replaces missing values by `"unknown"` and converts every column to a factor.
+
+Columns can be given by their names (recommended, as it is easier to read and
+does not depend on the order of the columns) or by their positions. Dates are
+read with `date_format`, `"%d/%m/%Y"` (e.g. `09/01/2020`) by default; use for
+instance `date_format = "%Y-%m-%d"` for dates such as `2020-01-09`. A date
+column already of class `Date` is used as is.
+
+```{r function-prepare_input}
+#' Prepare the metadata table used for strain selection
+#'
+#' Checks that strain identifiers are unique, keeps the metadata columns used
+#' for the selection, optionally extracts the year and/or the month from a
+#' date column, replaces missing values by `"unknown"` and converts every
+#' column to a factor.
+#'
+#' @param data A data frame (or a matrix) with one row per strain.
+#' @param col_select Names or positions of the metadata columns to keep. The
+#'   identifier and date columns are always removed from this selection.
+#'   Defaults to all columns.
+#' @param id Name or position of the column containing the strain
+#'   identifiers.
+#' @param date Name or position of the date column, or `NULL` (default) if no
+#'   date should be used. `0` is also accepted for "no date".
+#' @param month If `TRUE`, a `MOIS` column with the month (`"01"` to `"12"`)
+#'   is created from the date column.
+#' @param year If `TRUE` (default), an `ANNEE` column with the year is created
+#'   from the date column.
+#' @param date_format Format of the dates, see [strptime()]. Defaults to
+#'   `"%d/%m/%Y"` (e.g. `09/01/2020`). Ignored when the date column is
+#'   already of class `Date` or `POSIXt`.
+#' @param m,a Deprecated, use `month` and `year` instead.
+#'
+#' @return A data frame with one row per strain (row names are the strain
+#'   identifiers) and one factor column per selected metadata, followed by
+#'   `ANNEE` and/or `MOIS` when a date column is used. Dates that cannot be
+#'   read give `"unknown"`.
+#' @export
+#' @family data preparation
+#' @examples
+prepare_input <- function (data, col_select = seq_len(ncol(data)), id = 1, date = NULL,
+                           month = FALSE, year = TRUE, date_format = "%d/%m/%Y",
+                           m, a) {
+  if (!missing(m)) {
+    warning("`m` is deprecated, use `month` instead.", call. = FALSE)
+    month <- m
+  }
+  if (!missing(a)) {
+    warning("`a` is deprecated, use `year` instead.", call. = FALSE)
+    year <- a
+  }
+  data <- as.data.frame(data)
+  id <- column_position(data, id, "id")
+  col_select <- column_position(data, col_select, "col_select")
+  if (isTRUE(all.equal(date, 0))) {
+    date <- NULL
+  }
+  if (!is.null(date)) {
+    date <- column_position(data, date, "date")
+  }
   duplicate <- which(duplicated(data[,id]))
   if (length(duplicate)!=0) {
     stop ( "duplicate ID : " , paste(data[duplicate,id], collapse = ", "))
   } else {
-    print("no duplicate ID")
+    message("no duplicate ID")
   }
   rownames(data) <- data[,id]
-  col_select<-col_select[! col_select %in% date]
-  clean_data <- data[,col_select]
-  if (date!=0){
-    if(a){
-      clean_data$ANNEE <- substr(data[,date],7,10)
+  col_select <- col_select[! col_select %in% c(id, date)]
+  clean_data <- data[, col_select, drop = FALSE]
+  if (!is.null(date)){
+    dates <- data[[date]]
+    if (inherits(dates, c("Date", "POSIXt"))) {
+      dates <- as.Date(dates)
+    } else {
+      dates <- as.Date(as.character(dates), format = date_format)
+      if (all(is.na(dates)) && any(!is.na(data[[date]]))) {
+        warning("no date could be read with date_format = \"", date_format,
+                "\"; check the `date_format` argument.", call. = FALSE)
+      }
     }
-    if(m){
-      clean_data$MOIS <- substr(data[,date],4,5)
+    if(year){
+      clean_data$ANNEE <- format(dates, "%Y")
+    }
+    if(month){
+      clean_data$MOIS <- format(dates, "%m")
     }
   }
   clean_data[is.na(clean_data)] <- "unknown"
   clean_data[] <- lapply(clean_data, factor)
-  print(colnames(clean_data))
-  str(clean_data)
+  message("selected metadata: ", paste(colnames(clean_data), collapse = ", "))
   clean_data
+}
+
+#' Convert column names or positions into positions
+#'
+#' @param data A data frame.
+#' @param x Column names (character) or positions (numeric).
+#' @param arg Name of the argument, used in error messages.
+#'
+#' @return An integer vector of column positions.
+#' @noRd
+column_position <- function(data, x, arg) {
+  if (is.character(x)) {
+    pos <- match(x, names(data))
+    if (anyNA(pos)) {
+      stop("unknown column(s) in `", arg, "`: ",
+           paste(x[is.na(pos)], collapse = ", "), call. = FALSE)
+    }
+    return(pos)
+  }
+  if (!is.numeric(x) || any(x < 1 | x > ncol(data))) {
+    stop("`", arg, "` must be column names or positions between 1 and ",
+         ncol(data), call. = FALSE)
+  }
+  as.integer(x)
 }
 ```
 
 ```{r examples-prepare_input}
-
-# Example with your dataset in "inst/"
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-# Apply my function
-prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
+raw_data <- salmonella_strains
+prepared_data <- prepare_input(
+  raw_data,
+  col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT", month = FALSE, year = TRUE
+)
+head(prepared_data)
+# the same with column positions
+prepared_data <- prepare_input(raw_data, col_select = c(5, 8, 11, 12, 15, 22),
+                               id = 1, date = 15)
 ```
 
 ```{r tests-prepare_input}
 data_test <- matrix("test",nrow = 3,ncol = 5)
-as.data.frame(data_test)
 test_that("prepare_input works properly and show error if needed", {
-  expect_error(prepare_input(data_test))
+  expect_error(prepare_input(data_test), "duplicate ID")
+})
+
+test_that("prepare_input selects columns, extracts dates and replaces NA", {
+  raw <- data.frame(
+    ID = c("s1", "s2", "s3"),
+    HOST = c("pig", NA, "cattle"),
+    DATE = c("09/01/2020", "15/03/2021", "30/12/2021"),
+    COUNTRY = c("FR", "FR", "IT")
+  )
+  expect_message(
+    res <- prepare_input(raw, col_select = 2:4, id = 1, date = 3, month = TRUE, year = TRUE),
+    "no duplicate ID"
+  )
+  expect_equal(rownames(res), c("s1", "s2", "s3"))
+  expect_equal(colnames(res), c("HOST", "COUNTRY", "ANNEE", "MOIS"))
+  expect_true(all(vapply(res, is.factor, logical(1))))
+  expect_equal(as.character(res$HOST), c("pig", "unknown", "cattle"))
+  expect_equal(as.character(res$ANNEE), c("2020", "2021", "2021"))
+  expect_equal(as.character(res$MOIS), c("01", "03", "12"))
+  expect_silent(suppressMessages(prepare_input(raw, col_select = 2:4, id = 1, date = 3)))
+  res_year <- suppressMessages(prepare_input(raw, col_select = 2:4, id = 1, date = 3))
+  expect_equal(colnames(res_year), c("HOST", "COUNTRY", "ANNEE"))
+})
+
+test_that("prepare_input accepts column names", {
+  raw <- data.frame(
+    ID = c("s1", "s2", "s3"),
+    HOST = c("pig", NA, "cattle"),
+    DATE = c("09/01/2020", "15/03/2021", "30/12/2021"),
+    COUNTRY = c("FR", "FR", "IT")
+  )
+  by_position <- suppressMessages(
+    prepare_input(raw, col_select = c(2, 4), id = 1, date = 3, month = TRUE)
+  )
+  by_name <- suppressMessages(
+    prepare_input(raw, col_select = c("HOST", "COUNTRY"), id = "ID", date = "DATE",
+                  month = TRUE)
+  )
+  expect_identical(by_name, by_position)
+  expect_error(prepare_input(raw, col_select = c("HOST", "SPECIES"), id = "ID"),
+               "unknown column\\(s\\) in `col_select`: SPECIES")
+  expect_error(prepare_input(raw, id = "STRAIN"), "unknown column\\(s\\) in `id`")
+  expect_error(prepare_input(raw, col_select = 2:9), "between 1 and 4")
+})
+
+test_that("prepare_input reads dates in other formats and handles bad dates", {
+  raw <- data.frame(
+    ID = c("s1", "s2", "s3"),
+    DATE = c("2020-01-09", NA, "2021-12-30")
+  )
+  res <- suppressMessages(
+    prepare_input(raw, id = "ID", date = "DATE", month = TRUE, date_format = "%Y-%m-%d")
+  )
+  expect_equal(as.character(res$ANNEE), c("2020", "unknown", "2021"))
+  expect_equal(as.character(res$MOIS), c("01", "unknown", "12"))
+  # Date class is used as is
+  raw$DATE <- as.Date(raw$DATE)
+  res_date <- suppressMessages(prepare_input(raw, id = "ID", date = "DATE", month = TRUE))
+  expect_identical(res_date, res)
+  # a wrong format gives a warning
+  raw$DATE <- c("2020-01-09", "2021-03-15", "2021-12-30")
+  expect_warning(suppressMessages(prepare_input(raw, id = "ID", date = "DATE")),
+                 "date_format")
+  # date = 0 means no date: DATE is then kept as an ordinary metadata
+  res0 <- suppressMessages(prepare_input(raw, id = "ID", date = 0))
+  expect_equal(colnames(res0), "DATE")
+})
+
+test_that("prepare_input drops the identifier column by default", {
+  raw <- data.frame(ID = c("s1", "s2"), HOST = c("pig", "cattle"))
+  res <- suppressMessages(prepare_input(raw))
+  expect_equal(colnames(res), "HOST")
+})
+
+test_that("prepare_input still accepts the deprecated m and a arguments", {
+  raw <- data.frame(ID = c("s1", "s2"), DATE = c("09/01/2020", "15/03/2021"))
+  expect_warning(
+    res <- suppressMessages(prepare_input(raw, id = 1, date = 2, m = TRUE, a = FALSE)),
+    "deprecated"
+  )
+  expect_equal(colnames(res), "MOIS")
 })
 ```
 
-# assess_gower function
+# Clustering method
 
-```{=html}
-<!--
-Include a data table describing bacterial strains according to a number of metadata.
-The assess_gower function runs the prepare_input function on the raw data table.
-Gower distances are calculated from the dataframe returned by the prepare_input function. The user can choose to apply weights on the metadata he wants to weight. 
-A hierarchical cluster analysis is performed using the gower distances and the "complete" method. 
-The dendrogram resulting from the hierarchical cluster analysis is plotted if graph=True.
--->
-```
+The clustering method uses three functions: `assess_gower()`,
+`cstats_table()` and `select_silhouette()`. `cstats_table()` is optional when
+the number of strains to sequence is fixed in advance.
+
+## Distances and tree: assess_gower
+
+`assess_gower()` computes a dissimilarity matrix between strains using the
+Gower distance, which is suited to categorical metadata. Weights can be given
+to the metadata to adjust their importance in the clustering. A hierarchical
+clustering with complete linkage is then performed on this matrix, and the
+dendrogram is drawn when `graph = TRUE`.
+
 ```{r function-assess_gower}
-#' assess_gower
+#' Compute Gower distances and the hierarchical clustering tree
 #'
-#' @param clean_data a dataframe
-#' @param weights a vector
-#' @param graph a boolean
+#' Computes the Gower dissimilarity between strains (suited to categorical
+#' metadata) and performs an agglomerative hierarchical clustering with
+#' complete linkage.
 #'
-#' @return a list containing the components clean_data, gower_dist, aggl.clust.c
+#' @param clean_data A data frame of factors, one row per strain, as returned
+#'   by [prepare_input()].
+#' @param weights Numeric vector of weights, one per column of `clean_data`,
+#'   to give more or less importance to each metadata. Defaults to equal
+#'   weights.
+#' @param graph If `TRUE` (default), the dendrogram is plotted.
+#'
+#' @return A list with two components:
+#'   \describe{
+#'     \item{gower_dist}{the Gower dissimilarity matrix, an object of class
+#'       `dissimilarity` / `dist` (see [cluster::daisy()]);}
+#'     \item{aggl.clust.c}{the clustering tree, an object of class `hclust`.}
+#'   }
+#' @source Adapted from the dissimilarity matrix and agglomerative clustering
+#'   steps of Anastasia Reusova's tutorial:
+#'   Reusova A. (2018). *Hierarchical Clustering on Categorical Data in R*.
+#'   Towards Data Science.
+#'   <https://medium.com/@anastasia.reusova/hierarchical-clustering-on-categorical-data-in-r-a27e578f2995>.
+#'   Code: <https://github.com/khunreus/cluster-categorical>.
 #' @export
+#' @family clustering method
 #' @importFrom cluster daisy
 #' @importFrom stats hclust
 #'
@@ -145,42 +395,86 @@ assess_gower <- function(clean_data, weights = rep.int(1, p), graph = TRUE){
 ```
 
 ```{r examples-assess_gower}
-# Example with your dataset in "inst/"
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-# Apply my function
-assess_gower(prepared_data, graph = TRUE)
+raw_data <- salmonella_strains
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
+gower <- assess_gower(prepared_data, graph = TRUE)
 ```
 
-# cstats_table function
-
-```{=html}
-<!--
-cstat_table create a dataframe including Cluster stats. The avg.silwidth is the data we are most interest in because it will be used to determine the optimal number of cluster to choose if necessary.
-The user enters a distance object and a dendogram object resulting from the function assess_gower. He can choose the number of cluster to test and a step to improve the execution time of the function.
--->
+```{r tests-assess_gower}
+test_that("assess_gower returns a Gower distance and a complete-linkage tree", {
+  clean_data <- data.frame(
+    HOST = factor(c("pig", "pig", "cattle", "cattle")),
+    COUNTRY = factor(c("FR", "FR", "FR", "IT")),
+    row.names = c("s1", "s2", "s3", "s4")
+  )
+  res <- assess_gower(clean_data, graph = FALSE)
+  expect_named(res, c("gower_dist", "aggl.clust.c"))
+  expect_s3_class(res$gower_dist, "dist")
+  expect_s3_class(res$aggl.clust.c, "hclust")
+  d <- as.matrix(res$gower_dist)
+  expect_equal(d["s1", "s2"], 0)
+  expect_equal(d["s1", "s3"], 0.5)
+  expect_equal(d["s1", "s4"], 1)
+  weighted <- as.matrix(assess_gower(clean_data, weights = c(3, 1), graph = FALSE)$gower_dist)
+  expect_equal(weighted["s1", "s3"], 0.75)
+})
 ```
+
+## Choosing the number of clusters: cstats_table
+
+`cstats_table()` computes clustering statistics (see `fpc::cluster.stats()`)
+for an increasing number of clusters: `step`, `2 * step`, ..., up to `k`. The
+average silhouette width (`avg.silwidth`) is the most useful one: it is
+plotted against the number of clusters, and the optimal number of clusters is
+marked by a maximum or a plateau of the curve. The idea is to test a large
+number of clusters without exceeding the number of strains that can be
+sequenced; a larger `step` reduces the computing time.
+
 ```{r function-cstats_table}
-#' cstats_table
+#' Clustering statistics for an increasing number of clusters
 #'
-#' @param dist a distance object 
-#' @param tree a dendrogram object
-#' @param k a number
-#' @param l a number
-#' @param graph_silhouette a boolean
+#' Cuts the clustering tree into `step`, `2 * step`, ..., `k` clusters and
+#' computes, for each number of clusters, the statistics of
+#' [fpc::cluster.stats()]. The average silhouette width can be plotted to help
+#' choosing the number of clusters.
 #'
-#' @return a dataframe with one row per number of clusters tested
+#' @param dist A dissimilarity object, e.g. `gower_dist` returned by
+#'   [assess_gower()].
+#' @param tree An `hclust` object, e.g. `aggl.clust.c` returned by
+#'   [assess_gower()].
+#' @param k Largest number of clusters to test. Must be a multiple of `step`.
+#' @param step Increment between two numbers of clusters tested.
+#' @param graph_silhouette If `TRUE` (default), the average silhouette width
+#'   is plotted against the number of clusters.
+#' @param l Deprecated, use `step` instead.
+#'
+#' @return A data frame with one row per number of clusters tested (row names
+#'   `Test <number of clusters>`) and the columns `cluster.number`, `n`,
+#'   `within.cluster.ss`, `average.within`, `average.between`, `wb.ratio`,
+#'   `dunn2`, `avg.silwidth` (see [fpc::cluster.stats()]), followed by
+#'   cluster size columns. Values are rounded to 2 decimals.
+#' @source Adapted from the `cstats.table()` function and the silhouette plot
+#'   of Anastasia Reusova's tutorial:
+#'   Reusova A. (2018). *Hierarchical Clustering on Categorical Data in R*.
+#'   Towards Data Science.
+#'   <https://medium.com/@anastasia.reusova/hierarchical-clustering-on-categorical-data-in-r-a27e578f2995>.
+#'   Code: <https://github.com/khunreus/cluster-categorical>.
 #' @export
+#' @family clustering method
 #' @importFrom fpc cluster.stats
 #' @importFrom stats cutree
 #' @importFrom ggplot2 ggplot aes .data geom_point geom_line ggtitle labs theme element_text
 #'
 #' @examples
-cstats_table <- function(dist, tree, k,l, graph_silhouette =TRUE) {
+cstats_table <- function(dist, tree, k, step, graph_silhouette = TRUE, l) {
+   if (!missing(l)) {
+     warning("`l` is deprecated, use `step` instead.", call. = FALSE)
+     step <- l
+   }
+   l <- step
    if (k %% l != 0) {
-     stop("k must be a multiple of l")
+     stop("k must be a multiple of step")
    }
    n=k/l
    clust.assess <- c("cluster.number","n","within.cluster.ss","average.within","average.between",
@@ -194,7 +488,7 @@ cstats_table <- function(dist, tree, k,l, graph_silhouette =TRUE) {
        row.clust[i] <- paste("Cluster-", i*l, " size")
    }
     for(i in 1:n){
-     print(i*l)
+     message("testing ", i*l, " clusters")
      stats.names[i] <- paste("Test", i*l)
      stats_i <- cluster.stats(d = dist, clustering = cutree(tree, k = i*l))
 
@@ -210,7 +504,6 @@ cstats_table <- function(dist, tree, k,l, graph_silhouette =TRUE) {
    cluster.sizes <- data.frame(cluster.sizes)
    cluster.sizes[is.na(cluster.sizes)] <- 0
    rows.all <- c(clust.assess, row.clust)
-   # rownames(output.stats.df) <- clust.assess
    output <- rbind(output.stats.df, cluster.sizes)
    colnames(output) <- stats.names[1:n]
    rownames(output) <- rows.all
@@ -231,270 +524,1207 @@ cstats_table <- function(dist, tree, k,l, graph_silhouette =TRUE) {
 ```
 
 ```{r examples-cstats_table}
-# Example with your dataset in "inst/"
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-gower <- assess_gower(prepared_data, graph = TRUE)
-# Apply my function
-cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c, k = 50,l = 10)
+raw_data <- salmonella_strains
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
+gower <- assess_gower(prepared_data, graph = FALSE)
+stats <- cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c,
+                      k = 60, step = 2)
 ```
+
+With a small step (here every 2 clusters), the curve shows two plateaus. The
+average silhouette width jumps to about 0.45 at 16 clusters and then stays
+between 0.39 and 0.43 up to 30 clusters: **about 15 clusters** is a first
+level that already captures the main structure of the collection. It jumps
+again to about 0.47 at 34 clusters and stays between 0.47 and 0.51 up to 52
+clusters: **about 33 clusters** is a second, finer level. Beyond, the
+curve increases up to the number of distinct profiles (61), where every
+profile is isolated: with categorical metadata, this maximum is not a natural
+level of grouping. The number of strains to sequence can be chosen at one of
+the two plateaus, depending on the resources available.
 
 ```{r tests-cstats_table}
 test_that("cstats_table returns the cluster stats table", {
-  datafile <- system.file("data_test.csv", package = "strainselect")
-  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
-  capture.output(
-    prepared_data <- prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  raw_data <- salmonella_strains
+  prepared_data <- suppressMessages(
+    prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
   )
   gower <- assess_gower(prepared_data, graph = FALSE)
-  capture.output(
-    stats <- cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, l = 10,
-                          graph_silhouette = FALSE)
+  expect_message(
+    stats <- cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, step = 10,
+                          graph_silhouette = FALSE),
+    "testing 10 clusters"
   )
   expect_s3_class(stats, "data.frame")
   expect_equal(nrow(stats), 3)
   expect_equal(stats$cluster.number, c(10, 20, 30))
-  expect_error(cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 25, l = 10),
+  expect_true(all(stats$avg.silwidth >= -1 & stats$avg.silwidth <= 1))
+  expect_error(cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 25, step = 10),
                "multiple")
+  expect_warning(
+    old_style <- suppressMessages(
+      cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 30, l = 10,
+                   graph_silhouette = FALSE)
+    ),
+    "deprecated"
+  )
+  expect_identical(old_style, stats)
 })
 ```
 
-# select_silhouette function
+## Selecting the strains: select_silhouette
 
-```{=html}
-<!--
-After setting the number of cluster chosen, the select_silhouette function selects the strain for each cluster that has the maximum silhouette, i.e. the one that is the best clustered.
-If there are multiple strains with a maximum silhouette for the same cluster a random selection is made between the strains concerned.
+The last step selects one strain to sequence in each cluster. The number of
+clusters `k` is either chosen from the silhouette plot or set to the number of
+strains that can be sequenced. For each cluster, the strain with the largest
+silhouette width — i.e. the best clustered strain — is selected. When several
+strains share the largest silhouette width in a cluster, one of them is chosen
+at random; use `seed` to make this choice reproducible.
 
-This function return a data frame with for each strain, its characteristics, its cluster, the corresponding cluster size and the strain selected for its cluster.
--->
-```
 ```{r function-select_silhouette}
-#' select_silhouette
+#' Select the best clustered strain of each cluster
 #'
-#' @param prepared_data a data frame
-#' @param dist a distance object
-#' @param k a integer
-#' @param isdiss logical value specifying wether x is a dissimilarity matrix
-#' @param hc_func the hierarchical clustering function to be used
-#' @param hc_method he agglomeration method to be used
+#' Cuts the strains into `k` clusters with [factoextra::hcut()] and selects,
+#' in each cluster, the strain with the largest silhouette width. When several
+#' strains share the largest silhouette width, one of them is chosen at
+#' random.
 #'
-#' @return a data frame
+#' @param prepared_data A data frame with one row per strain, as returned by
+#'   [prepare_input()]. Its rows must be in the same order as in `dist`.
+#' @param dist A dissimilarity object, e.g. `gower_dist` returned by
+#'   [assess_gower()].
+#' @param k Number of clusters, i.e. number of strains to select. Must be
+#'   between 2 and the number of strains minus 1.
+#' @param isdiss Logical, whether `dist` is a dissimilarity object (default:
+#'   `TRUE` when `dist` inherits from `"dist"`).
+#' @param hc_func Hierarchical clustering function passed to
+#'   [factoextra::hcut()]: `"hclust"` (default), `"agnes"` or `"diana"`.
+#' @param hc_method Agglomeration method passed to [factoextra::hcut()],
+#'   `"complete"` by default.
+#' @param seed An integer passed to [set.seed()] to make the choice between
+#'   ex aequo strains reproducible, or `NULL` (default) to leave the random
+#'   number generator untouched.
+#'
+#' @return `prepared_data` with three additional columns:
+#'   \describe{
+#'     \item{cluster}{the cluster of the strain;}
+#'     \item{size}{the number of strains in this cluster;}
+#'     \item{selected}{the identifier of the strain selected for this
+#'       cluster.}
+#'   }
+#'   The selected strains are given by `unique(result$selected)`.
 #' @export
-#' @importFrom factoextra hcut fviz_silhouette
+#' @family clustering method
+#' @importFrom factoextra hcut
 #'
 #' @examples
- select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(dist, "dist"),
-                               hc_func = "hclust", hc_method = "complete") {
-   clust2 <- hcut(dist, k, isdiss,hc_func, hc_method)
-   silh <- fviz_silhouette(clust2)
-   selected_data <- prepared_data
-   selected_data$cluster <- clust2$cluster
-   n=nrow(selected_data)
-   selection <- rep(NA,k)
-   for(i in 1:k){
-     max_silh_i <- silh$data[which(silh$data$sil_width==max(silh$data$sil_width[silh$data$cluster==i])&silh$data$cluster==i),]
-     if (nrow(max_silh_i)==1){
-       selection[i] <- as.character(max_silh_i$name)
-     } else {
-       selection[i] <- as.character(sample(max_silh_i$name,1))
-     } 
-   }
-   for (i in 1:n){
-     for (j in 1:k){
-       if (selected_data$cluster[i]==j){
-         selected_data$size[i] <- clust2$size[j]
-         selected_data$selected[i] <- selection[j]
-         
-       }
-     }
-   }
-   selected_data
- }
+select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(dist, "dist"),
+                               hc_func = "hclust", hc_method = "complete", seed = NULL) {
+  n <- nrow(prepared_data)
+  if (k < 2 || k >= n) {
+    stop("k must be between 2 and the number of strains minus 1")
+  }
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+  clust2 <- hcut(dist, k, isdiss, hc_func, hc_method)
+  widths <- clust2$silinfo$widths
+  selection <- vapply(seq_len(k), function(i) {
+    widths_i <- widths[widths$cluster == i, , drop = FALSE]
+    best <- rownames(widths_i)[widths_i$sil_width == max(widths_i$sil_width)]
+    if (length(best) > 1) {
+      best <- best[sample.int(length(best), 1)]
+    }
+    best
+  }, character(1))
+  selected_data <- prepared_data
+  selected_data$cluster <- unname(clust2$cluster)
+  selected_data$size <- clust2$size[clust2$cluster]
+  selected_data$selected <- selection[clust2$cluster]
+  selected_data
+}
 ```
 
 ```{r examples-select_silhouette}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-gower <- assess_gower(prepared_data, graph = TRUE)
-
-select_silhouette(dist=gower$gower_dist,prepared_data = prepared_data, k=50, hc_func = "hclust", hc_method = "complete")
+raw_data <- salmonella_strains
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
+gower <- assess_gower(prepared_data, graph = FALSE)
+selection <- select_silhouette(prepared_data, dist = gower$gower_dist, k = 20,
+                               seed = 1)
+# the 20 strains to sequence
+unique(selection$selected)
 ```
 
 ```{r tests-select_silhouette}
 test_that("select_silhouette selects one strain per cluster without global objects", {
-  datafile <- system.file("data_test.csv", package = "strainselect")
-  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
-  capture.output(
-    prepared_data <- prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  raw_data <- salmonella_strains
+  prepared_data <- suppressMessages(
+    prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
   )
   dist <- assess_gower(prepared_data, graph = FALSE)$gower_dist
-  capture.output(selected <- select_silhouette(prepared_data, dist, k = 10))
+  selected <- select_silhouette(prepared_data, dist, k = 10)
   expect_equal(nrow(selected), nrow(prepared_data))
   expect_true(all(c("cluster", "size", "selected") %in% colnames(selected)))
   expect_equal(length(unique(selected$selected)), 10)
+  # each selected strain belongs to the cluster it represents
+  expect_equal(selected[selected$selected, "cluster"], selected$cluster)
+  # size is the number of strains in the cluster
+  expect_equal(selected$size, as.vector(table(selected$cluster)[as.character(selected$cluster)]))
+})
+
+test_that("select_silhouette is reproducible with seed and checks k", {
+  raw_data <- salmonella_strains
+  prepared_data <- suppressMessages(
+    prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
+  )
+  dist <- assess_gower(prepared_data, graph = FALSE)$gower_dist
+  expect_identical(select_silhouette(prepared_data, dist, k = 20, seed = 42),
+                   select_silhouette(prepared_data, dist, k = 20, seed = 42))
+  expect_error(select_silhouette(prepared_data, dist, k = 1), "k must be")
+  expect_error(select_silhouette(prepared_data, dist, k = nrow(prepared_data)), "k must be")
 })
 ```
 
-# prepare_upset function
+# Selecting strains for a sequencing budget: select_strains
 
-```{=html}
-<!--
-The prepare_upset allows to prepare the dataframe used to visualize the interactions. it uses the modalities of the different variables of prepared_data dataframe as columns and fills the rows with 1 if the strain is concerned by the modality and 0 otherwise.
--->
-```
-```{r function-prepare_upset}
-#' prepare_upset
+`select_strains()` runs the whole clustering method in one step and answers
+the practical question "*I can sequence at most `n_max` strains: which ones?*".
+
+1. It computes the Gower distances and the clustering tree (as
+   `assess_gower()`), then the average silhouette width for every number of
+   clusters from 2 to the number of distinct profiles. The number of clusters
+   with the largest average silhouette width is the **optimal number of
+   clusters** `k_opt`.
+2. It selects the strains according to the budget `n_max`:
+   - no budget (`n_max = NULL`): one strain per optimal cluster, i.e. `k_opt`
+     strains, with the status `"optimal"`;
+   - budget larger than the optimum (`n_max >= k_opt`): the `k_opt` optimal
+     strains, completed up to `n_max` strains (status `"supplementary"`) by
+     cutting the tree into `n_max` clusters. Use `fill = FALSE` to stop at the
+     optimum. As the clusters are nested, each supplementary strain comes from
+     a cluster that does not contain an optimal strain yet;
+   - budget smaller than the optimum (`n_max < k_opt`): the tree is cut into
+     `n_max` clusters and one strain is selected in each (status
+     `"selected"`). The optimal groups that are not represented by any
+     selected strain are listed, so that the user knows what is missed.
+
+In each cluster, the selected strain is the one with the largest silhouette
+width, i.e. the best clustered one (ties are broken at random, use `seed` for
+reproducibility).
+
+With categorical metadata and equal weights, identical strains are at
+distance 0 and the optimum is often close to the number of distinct profiles:
+supplementary strains then mostly have the same metadata as already selected
+strains, and add replicates rather than diversity. This is not a general
+rule. The weights change the Gower distances between different strains, hence
+the tree, the silhouette curve and the optimum (in the example of this
+vignette, a weight of 3 on `REGION` lowers the optimum from 61 to 22
+clusters), and supplementary strains can then add new profiles. Conversely,
+below the optimum, the strains of a cluster are similar but not identical.
+The report written by `report_selection()` gives, for the actual data, the
+number of supplementary strains that have the same metadata as an already
+selected strain, and how much the strains differ from the selected strain of
+their cluster.
+
+`select_strains(method = "profile")` applies the same logic to the profile
+method. The strains with identical metadata form groups, sorted by decreasing
+size (groups of the same size in random order); one strain per group is the
+optimal selection:
+
+- budget smaller than the number of groups: one strain in each of the `n_max`
+  largest groups — the most frequent profiles are favoured, and the smallest
+  groups (often strains with a unique profile) are listed as not represented;
+- budget larger than the number of groups: one strain per group, then
+  supplementary strains added turn by turn — a second strain in each group
+  that has one, from the largest group to the smallest, then a third strain,
+  and so on.
+
+Within a group, the strains have the same metadata and are chosen at random
+(use `seed` for reproducibility).
+
+```{r function-select_strains}
+#' Select strains to sequence, with or without a maximum number of strains
 #'
-#' @param prepared_data a dataframe
+#' Selects the strains to sequence with the clustering method or with the
+#' profile method, taking into account the maximum number of strains that
+#' can be sequenced.
 #'
-#' @return a dataframe
+#' **Clustering method** (`method = "clustering"`, default): computes the
+#' Gower distances and the hierarchical clustering tree, finds the optimal
+#' number of clusters (largest average silhouette width) and selects in each
+#' cluster the strain with the largest silhouette width.
+#'
+#' **Profile method** (`method = "profile"`): groups the strains with
+#' identical metadata (distinct profiles) and sorts the groups by decreasing
+#' size (ties in random order). One strain per group gives the "optimal"
+#' selection. With a smaller `n_max`, one strain is selected in each of the
+#' `n_max` largest groups. With a larger `n_max`, supplementary strains are
+#' added turn by turn: a second strain in each group that has one, from the
+#' largest group to the smallest, then a third strain, and so on. Strains of
+#' a group have the same metadata, so the strain(s) of a group are chosen at
+#' random.
+#'
+#' @param prepared_data A data frame with one row per strain, as returned by
+#'   [prepare_input()].
+#' @param n_max Maximum number of strains that can be sequenced, or `NULL`
+#'   (default) to select the optimal number of strains (one per optimal
+#'   cluster or one per distinct profile).
+#' @param method `"clustering"` (default) or `"profile"`.
+#' @param fill If `TRUE` (default) and `n_max` is larger than the optimal
+#'   number of strains, the selection is completed up to `n_max` strains
+#'   with supplementary strains. If `FALSE`, the selection stops at the
+#'   optimum.
+#' @param weights Clustering method only: numeric vector of weights, one per
+#'   column of `prepared_data` (see [assess_gower()]), or `NULL` for equal
+#'   weights.
+#' @param k_max Clustering method only: largest number of clusters tested to
+#'   find the optimum. By default, the number of distinct profiles (beyond
+#'   it, clusters only split identical strains), limited to the number of
+#'   strains minus 1. Lower it to save time on large datasets.
+#' @param seed An integer passed to [set.seed()] to make the random choices
+#'   reproducible (ex aequo strains or groups), or `NULL` (default).
+#'
+#' @return An object of class `strainselect_selection`, a list with:
+#'   \describe{
+#'     \item{table}{`prepared_data` with the columns `cluster` (cluster in
+#'       the final cut of the tree, or group of identical strains numbered by
+#'       decreasing size for the profile method), `optimal_group` (cluster at
+#'       the optimal number of clusters, or group of identical strains),
+#'       `selected` (`TRUE`/`FALSE`), `status` (`"optimal"`,
+#'       `"supplementary"`, `"selected"` or `"not selected"`),
+#'       `representative` (identifier of the selected strain of the same
+#'       cluster or group, `NA` if none) and `group_represented` (whether the
+#'       optimal group of the strain contains a selected strain);}
+#'     \item{selected}{identifiers of the selected strains;}
+#'     \item{method}{the method used;}
+#'     \item{k_opt}{optimal number of strains: optimal number of clusters, or
+#'       number of distinct profiles for the profile method;}
+#'     \item{k}{number of selected strains;}
+#'     \item{n_max, fill}{the arguments used;}
+#'     \item{silhouette}{clustering method: data frame of the average
+#'       silhouette width (`avg_silwidth`) for each number of clusters `k`
+#'       tested;}
+#'     \item{groups}{profile method: data frame with, for each group of
+#'       identical strains, its `size`, its number of selected strains
+#'       (`n_selected`) and its `profile`;}
+#'     \item{unrepresented_groups}{optimal groups without any selected
+#'       strain (only when `n_max` is smaller than the optimum);}
+#'     \item{n_strains, n_profiles}{number of strains and of distinct
+#'       profiles;}
+#'     \item{weights}{the weights of the metadata (clustering method);}
+#'     \item{gower}{the output of [assess_gower()] (clustering method).}
+#'   }
+#'   The object has `print()` and `plot()` methods, and can be exported with
+#'   [export_selection()] or summarised in a report with
+#'   [report_selection()].
 #' @export
+#' @family clustering method
+#' @family profile method
+#' @importFrom cluster silhouette
+#' @importFrom stats cutree
+#'
+#' @examples
+select_strains <- function(prepared_data, n_max = NULL,
+                           method = c("clustering", "profile"), fill = TRUE,
+                           weights = NULL, k_max = NULL, seed = NULL) {
+  method <- match.arg(method)
+  n <- nrow(prepared_data)
+  n_profiles <- nrow(unique(prepared_data))
+  if (n < 3 || n_profiles < 2) {
+    stop("at least 3 strains and 2 distinct profiles are needed", call. = FALSE)
+  }
+  if (!is.null(n_max)) {
+    if (!is.numeric(n_max) || length(n_max) != 1 || n_max < 1) {
+      stop("`n_max` must be a positive number", call. = FALSE)
+    }
+    n_max <- as.integer(n_max)
+    if (n_max > n) {
+      message("n_max (", n_max, ") is larger than the number of strains: ",
+              "all ", n, " strains are selected")
+      n_max <- n
+    }
+  }
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+  if (method == "profile") {
+    return(select_by_profile(prepared_data, n_max, fill, n_profiles))
+  }
+  if (is.null(weights)) {
+    weights <- rep.int(1, ncol(prepared_data))
+  }
+  gower <- assess_gower(prepared_data, weights = weights, graph = FALSE)
+  dist <- gower$gower_dist
+  tree <- gower$aggl.clust.c
+  if (is.null(k_max)) {
+    k_max <- n_profiles
+  }
+  k_max <- max(2, min(k_max, n - 1))
+  ks <- 2:k_max
+  avg_silwidth <- vapply(ks, function(k) {
+    summary(silhouette(cutree(tree, k = k), dist))$avg.width
+  }, numeric(1))
+  k_opt <- ks[which.max(avg_silwidth)]
+
+  optimal_group <- cutree(tree, k = k_opt)
+  optimal <- best_strains(tree, dist, k_opt)
+  if (is.null(n_max)) {
+    k <- k_opt
+  } else if (n_max >= k_opt) {
+    k <- if (fill) n_max else k_opt
+  } else {
+    k <- n_max
+  }
+  cluster <- cutree(tree, k = k)
+  if (k >= k_opt) {
+    # clusters are nested: complete the optimal strains with one strain in
+    # each cluster that does not contain an optimal strain yet
+    missing_clusters <- setdiff(seq_len(k), cluster[optimal])
+    supplementary <- unname(best_strains(tree, dist, k)[missing_clusters])
+    selected <- c(optimal, supplementary)
+    status <- ifelse(rownames(prepared_data) %in% optimal, "optimal",
+                     ifelse(rownames(prepared_data) %in% supplementary,
+                            "supplementary", "not selected"))
+  } else {
+    selected <- best_strains(tree, dist, k)
+    status <- ifelse(rownames(prepared_data) %in% selected, "selected",
+                     "not selected")
+  }
+  selected <- unname(selected)
+  representative <- vapply(cluster, function(cl) {
+    selected[cluster[selected] == cl][1]
+  }, character(1))
+  represented_groups <- unique(optimal_group[selected])
+
+  table <- prepared_data
+  table$cluster <- unname(cluster)
+  table$optimal_group <- unname(optimal_group)
+  table$selected <- rownames(prepared_data) %in% selected
+  table$status <- status
+  table$representative <- unname(representative)
+  table$group_represented <- unname(optimal_group) %in% represented_groups
+
+  structure(
+    list(
+      table = table,
+      selected = selected,
+      method = "clustering",
+      k_opt = k_opt,
+      k = k,
+      n_max = n_max,
+      fill = fill,
+      silhouette = data.frame(k = ks, avg_silwidth = avg_silwidth),
+      groups = NULL,
+      unrepresented_groups = setdiff(seq_len(k_opt), represented_groups),
+      n_strains = n,
+      n_profiles = n_profiles,
+      weights = weights,
+      gower = gower
+    ),
+    class = "strainselect_selection"
+  )
+}
+
+#' Selection with the profile method
+#'
+#' @param prepared_data,n_max,fill See [select_strains()].
+#' @param n_profiles Number of distinct profiles.
+#'
+#' @return An object of class `strainselect_selection`.
+#' @noRd
+select_by_profile <- function(prepared_data, n_max, fill, n_profiles) {
+  ids <- rownames(prepared_data)
+  profile <- do.call(paste, c(lapply(prepared_data, as.character), sep = " | "))
+  sizes <- table(profile)
+  # groups numbered by decreasing size, ties in random order
+  ord <- order(-as.vector(sizes), sample.int(length(sizes)))
+  group_number <- stats::setNames(seq_along(ord), names(sizes)[ord])
+  group <- unname(group_number[profile])
+  n_groups <- length(sizes)
+  # strains of a group in random order: the first one is chosen first
+  members <- split(ids, factor(group, levels = seq_len(n_groups)))
+  members <- lapply(members, function(m) m[sample.int(length(m))])
+
+  if (is.null(n_max)) {
+    k <- n_groups
+  } else if (n_max >= n_groups) {
+    k <- if (fill) n_max else n_groups
+  } else {
+    k <- n_max
+  }
+  first <- vapply(members, `[`, character(1), 1)
+  if (k < n_groups) {
+    selected <- unname(first[seq_len(k)])
+    status <- ifelse(ids %in% selected, "selected", "not selected")
+  } else {
+    # one strain per group, then turn by turn from the largest group
+    supplementary <- character(0)
+    turn <- 2
+    while (n_groups + length(supplementary) < k) {
+      for (g in seq_len(n_groups)) {
+        if (length(members[[g]]) >= turn && n_groups + length(supplementary) < k) {
+          supplementary <- c(supplementary, members[[g]][turn])
+        }
+      }
+      turn <- turn + 1
+    }
+    selected <- c(unname(first), supplementary)
+    status <- ifelse(ids %in% first, "optimal",
+                     ifelse(ids %in% supplementary, "supplementary",
+                            "not selected"))
+  }
+  is_selected <- ids %in% selected
+  represented_groups <- unique(group[is_selected])
+  representative <- ifelse(group %in% represented_groups,
+                           unname(first[group]), NA_character_)
+
+  table <- prepared_data
+  table$cluster <- group
+  table$optimal_group <- group
+  table$selected <- is_selected
+  table$status <- status
+  table$representative <- representative
+  table$group_represented <- group %in% represented_groups
+
+  groups <- data.frame(
+    group = seq_len(n_groups),
+    size = as.vector(sizes)[ord],
+    n_selected = as.vector(table(factor(group[is_selected],
+                                        levels = seq_len(n_groups)))),
+    profile = names(sizes)[ord]
+  )
+
+  structure(
+    list(
+      table = table,
+      selected = selected,
+      method = "profile",
+      k_opt = n_groups,
+      k = length(selected),
+      n_max = n_max,
+      fill = fill,
+      silhouette = NULL,
+      groups = groups,
+      unrepresented_groups = setdiff(seq_len(n_groups), represented_groups),
+      n_strains = nrow(prepared_data),
+      n_profiles = n_profiles,
+      weights = NULL,
+      gower = NULL
+    ),
+    class = "strainselect_selection"
+  )
+}
+
+#' Best clustered strain of each cluster
+#'
+#' @param tree An `hclust` object.
+#' @param dist The dissimilarity object used to build `tree`.
+#' @param k Number of clusters.
+#'
+#' @return A character vector with, for each cluster `1:k`, the identifier of
+#'   the strain with the largest silhouette width (ties broken at random).
+#' @noRd
+best_strains <- function(tree, dist, k) {
+  ids <- attr(dist, "Labels")
+  cluster <- cutree(tree, k = k)
+  if (k >= length(ids)) {
+    return(ids[order(cluster)])
+  }
+  sil_width <- silhouette(cluster, dist)[, "sil_width"]
+  vapply(seq_len(k), function(i) {
+    in_cluster <- which(cluster == i)
+    best <- in_cluster[sil_width[in_cluster] == max(sil_width[in_cluster])]
+    if (length(best) > 1) {
+      best <- best[sample.int(length(best), 1)]
+    }
+    ids[best]
+  }, character(1))
+}
+
+#' @export
+print.strainselect_selection <- function(x, ...) {
+  profile <- identical(x$method, "profile")
+  cat("Strain selection (", if (profile) "profile" else "clustering",
+      " method)\n", sep = "")
+  cat("  strains:", x$n_strains, "- distinct profiles:", x$n_profiles, "\n")
+  if (profile) {
+    cat("  groups of identical strains:", x$k_opt, "\n")
+  } else {
+    cat("  optimal number of clusters (k_opt):", x$k_opt, "\n")
+  }
+  if (is.null(x$n_max)) {
+    cat("  maximum number of strains (n_max): not given\n")
+  } else {
+    cat("  maximum number of strains (n_max):", x$n_max, "\n")
+  }
+  status <- table(factor(x$table$status[x$table$selected],
+                         levels = c("optimal", "supplementary", "selected")))
+  status <- status[status > 0]
+  cat("  selected strains:", length(x$selected),
+      paste0("(", paste(names(status), status, sep = ": ", collapse = ", "), ")"),
+      "\n")
+  if (!is.null(x$n_max) && x$n_max > x$k_opt && !x$fill) {
+    cat("  the selection stops at the optimum:", x$n_max - x$k_opt,
+        "strains of the budget are not used (fill = FALSE)\n")
+  }
+  if (length(x$unrepresented_groups) > 0) {
+    cat(if (profile) "  groups not represented:" else "  optimal groups not represented:",
+        length(x$unrepresented_groups), "out of", x$k_opt, "\n")
+  }
+  invisible(x)
+}
+
+#' @export
+#' @importFrom ggplot2 ggplot aes .data geom_point geom_line geom_vline geom_col annotate labs
+plot.strainselect_selection <- function(x, ...) {
+  if (identical(x$method, "profile")) {
+    p <- ggplot(x$groups, aes(x = .data$group)) +
+      geom_col(aes(y = .data$size), fill = "grey80") +
+      geom_col(aes(y = .data$n_selected), fill = "steelblue") +
+      labs(x = "Group of identical strains (by decreasing size)",
+           y = "Number of strains",
+           title = "Selected strains (blue) in each group (grey)")
+    if (!is.null(x$n_max) && x$n_max < x$k_opt) {
+      p <- p +
+        geom_vline(xintercept = x$n_max + 0.5, linetype = "dotted",
+                   colour = "firebrick") +
+        annotate("text", x = x$n_max + 0.5, y = max(x$groups$size),
+                 label = paste("n_max =", x$n_max), colour = "firebrick",
+                 hjust = -0.1, vjust = 1)
+    }
+    return(p)
+  }
+  p <- ggplot(x$silhouette, aes(x = .data$k, y = .data$avg_silwidth)) +
+    geom_line() +
+    geom_point() +
+    geom_vline(xintercept = x$k_opt, linetype = "dashed", colour = "darkgreen") +
+    annotate("text", x = x$k_opt, y = min(x$silhouette$avg_silwidth),
+             label = paste("k_opt =", x$k_opt), colour = "darkgreen",
+             hjust = 1.1, vjust = 0) +
+    labs(x = "Number of clusters", y = "Average silhouette width",
+         title = "Choice of the number of strains")
+  if (!is.null(x$n_max)) {
+    p <- p +
+      geom_vline(xintercept = x$n_max, linetype = "dotted", colour = "firebrick") +
+      annotate("text", x = x$n_max, y = max(x$silhouette$avg_silwidth),
+               label = paste("n_max =", x$n_max), colour = "firebrick",
+               hjust = -0.1, vjust = 1)
+  }
+  p
+}
+```
+
+```{r examples-select_strains}
+prepared_data <- prepare_input(
+  salmonella_strains,
+  col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT"
+)
+# clustering method, no budget: optimal number of strains
+res <- select_strains(prepared_data, seed = 1)
+res
+plot(res)
+# budget smaller than the optimum
+res_20 <- select_strains(prepared_data, n_max = 20, seed = 1)
+res_20
+head(res_20$table[, c("cluster", "optimal_group", "selected", "status")])
+# profile method, budget larger than the number of distinct profiles
+res_profile <- select_strains(prepared_data, n_max = 75, method = "profile", seed = 1)
+res_profile
+plot(res_profile)
+head(res_profile$groups)
+# profile method, budget smaller than the number of distinct profiles:
+# one strain in each of the 20 largest groups
+res_profile_20 <- select_strains(prepared_data, n_max = 20, method = "profile", seed = 1)
+plot(res_profile_20)
+```
+
+```{r tests-select_strains}
+prepared_test <- function() {
+  suppressMessages(prepare_input(
+    salmonella_strains,
+    col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+    id = "IDENTIFIANT", date = "DATE_PRELEVEMENT"
+  ))
+}
+
+test_that("select_strains selects the optimal number of strains by default", {
+  pd <- prepared_test()
+  res <- select_strains(pd, seed = 1)
+  expect_s3_class(res, "strainselect_selection")
+  expect_equal(res$method, "clustering")
+  expect_equal(res$k_opt, res$silhouette$k[which.max(res$silhouette$avg_silwidth)])
+  expect_equal(length(res$selected), res$k_opt)
+  expect_true(all(res$table$status[res$table$selected] == "optimal"))
+  # one selected strain per cluster, which represents its cluster
+  expect_equal(sort(unique(res$table$cluster[res$table$selected])), seq_len(res$k_opt))
+  expect_equal(res$table[res$table$representative, "cluster"], res$table$cluster)
+  expect_length(res$unrepresented_groups, 0)
+  expect_output(print(res), "optimal number of clusters")
+  expect_s3_class(plot(res), "ggplot")
+})
+
+test_that("select_strains completes the selection up to n_max", {
+  pd <- prepared_test()
+  opt <- select_strains(pd, seed = 1)
+  n_max <- opt$k_opt + 10
+  res <- select_strains(pd, n_max = n_max, seed = 1)
+  expect_equal(length(res$selected), n_max)
+  expect_equal(sum(res$table$status == "optimal"), opt$k_opt)
+  expect_equal(sum(res$table$status == "supplementary"), 10)
+  # the optimal strains are those of the selection without budget
+  expect_setequal(rownames(res$table)[res$table$status == "optimal"], opt$selected)
+  expect_equal(sort(unique(res$table$cluster[res$table$selected])), seq_len(n_max))
+  # fill = FALSE stops at the optimum
+  res_nofill <- select_strains(pd, n_max = n_max, fill = FALSE, seed = 1)
+  expect_equal(length(res_nofill$selected), opt$k_opt)
+  expect_output(print(res_nofill), "not used")
+})
+
+test_that("select_strains respects a budget smaller than the optimum", {
+  pd <- prepared_test()
+  res <- select_strains(pd, n_max = 20, seed = 1)
+  expect_equal(length(res$selected), 20)
+  expect_true(all(res$table$status[res$table$selected] == "selected"))
+  expect_equal(sort(unique(res$table$cluster[res$table$selected])), 1:20)
+  # unrepresented optimal groups are reported
+  expect_equal(length(res$unrepresented_groups), res$k_opt - 20)
+  expect_false(any(res$table$group_represented[
+    res$table$optimal_group %in% res$unrepresented_groups]))
+  expect_output(print(res), "not represented")
+})
+
+test_that("select_strains checks its arguments and is reproducible", {
+  pd <- prepared_test()
+  expect_identical(select_strains(pd, n_max = 30, seed = 3)$selected,
+                   select_strains(pd, n_max = 30, seed = 3)$selected)
+  expect_error(select_strains(pd, n_max = 0), "positive")
+  expect_message(res <- select_strains(pd, n_max = 500), "all 100 strains")
+  expect_equal(length(res$selected), 100)
+  expect_error(select_strains(pd[1:2, ]), "at least 3 strains")
+  expect_error(select_strains(pd, method = "other"))
+})
+
+test_that("profile method: one strain per distinct profile by default", {
+  pd <- prepared_test()
+  res <- select_strains(pd, method = "profile", seed = 1)
+  n_profiles <- nrow(unique(pd))
+  expect_equal(res$method, "profile")
+  expect_equal(res$k_opt, n_profiles)
+  expect_equal(length(res$selected), n_profiles)
+  expect_true(all(res$table$status[res$table$selected] == "optimal"))
+  expect_true(all(res$groups$n_selected == 1))
+  # groups are numbered by decreasing size
+  expect_false(is.unsorted(rev(res$groups$size)))
+  expect_equal(res$groups$size, as.vector(table(res$table$cluster)))
+  # strains of a group have the same profile
+  profiles <- do.call(paste, lapply(pd, as.character))
+  expect_true(all(tapply(profiles, res$table$cluster, function(p) length(unique(p))) == 1))
+  expect_output(print(res), "profile method")
+  expect_s3_class(plot(res), "ggplot")
+})
+
+test_that("profile method: largest groups first when n_max is smaller", {
+  pd <- prepared_test()
+  res <- select_strains(pd, n_max = 20, method = "profile", seed = 1)
+  expect_equal(length(res$selected), 20)
+  expect_true(all(res$table$status[res$table$selected] == "selected"))
+  expect_equal(res$groups$n_selected, rep(c(1, 0), c(20, res$k_opt - 20)))
+  expect_equal(res$unrepresented_groups, 21:res$k_opt)
+  # the selected groups are at least as large as the others
+  expect_gte(min(res$groups$size[1:20]), max(res$groups$size[-(1:20)]))
+  expect_true(all(is.na(res$table$representative[!res$table$group_represented])))
+  expect_output(print(res), "groups not represented")
+})
+
+test_that("profile method: supplementary strains turn by turn", {
+  pd <- prepared_test()
+  res <- select_strains(pd, n_max = 75, method = "profile", seed = 1)
+  n_groups <- res$k_opt
+  extra <- 75 - n_groups
+  expect_equal(length(res$selected), 75)
+  expect_equal(sum(res$table$status == "optimal"), n_groups)
+  expect_equal(sum(res$table$status == "supplementary"), extra)
+  # second turn: one more strain in the largest groups that have one
+  can_have_2 <- which(res$groups$size >= 2)
+  expected <- pmin(res$groups$size, 1)
+  expected[can_have_2[seq_len(min(extra, length(can_have_2)))]] <- 2
+  if (extra <= length(can_have_2)) {
+    expect_equal(res$groups$n_selected, expected)
+  }
+  # all strains when n_max = number of strains; fill = FALSE stops at the profiles
+  expect_equal(length(select_strains(pd, n_max = 100, method = "profile")$selected), 100)
+  expect_equal(length(select_strains(pd, n_max = 75, method = "profile",
+                                     fill = FALSE)$selected), n_groups)
+  expect_identical(select_strains(pd, n_max = 30, method = "profile", seed = 2)$selected,
+                   select_strains(pd, n_max = 30, method = "profile", seed = 2)$selected)
+})
+```
+
+## Exporting the result: export_selection
+
+`export_selection()` returns — and optionally writes to a CSV file — the
+original metadata table with the columns added by `select_strains()`. The file
+can be opened in a spreadsheet and filtered on `selected` to get the list of
+strains to sequence.
+
+```{r function-export_selection}
+#' Export the strain selection with the original metadata
+#'
+#' Adds the results of [select_strains()] (`cluster`, `optimal_group`,
+#' `selected`, `status`, `representative`, `group_represented`) to the
+#' original metadata table and optionally writes it to a CSV file.
+#'
+#' @param x An object returned by [select_strains()].
+#' @param data The original metadata table (e.g. the table given to
+#'   [prepare_input()]), or `NULL` to export only the metadata used for the
+#'   selection.
+#' @param id Name or position of the column of `data` containing the strain
+#'   identifiers.
+#' @param file Path of the CSV file to write, or `NULL` (default) to write
+#'   nothing.
+#' @param sep Field separator of the CSV file (`";"` by default).
+#'
+#' @return A data frame with one row per strain (in the order of `data`):
+#'   the columns of `data` followed by the columns of the selection. It is
+#'   returned invisibly when `file` is given.
+#' @export
+#' @family clustering method
+#' @importFrom utils write.table
+#'
+#' @examples
+export_selection <- function(x, data = NULL, id = 1, file = NULL, sep = ";") {
+  if (!inherits(x, "strainselect_selection")) {
+    stop("`x` must be the result of select_strains()", call. = FALSE)
+  }
+  added <- c("cluster", "optimal_group", "selected", "status",
+             "representative", "group_represented")
+  results <- x$table[, added]
+  if (is.null(data)) {
+    out <- data.frame(id = rownames(x$table),
+                      x$table[, setdiff(names(x$table), added), drop = FALSE],
+                      results, row.names = NULL, check.names = FALSE)
+  } else {
+    data <- as.data.frame(data)
+    id <- column_position(data, id, "id")
+    ids <- as.character(data[[id]])
+    if (!all(rownames(x$table) %in% ids)) {
+      stop("some strains of the selection are not in `data`; check `id`",
+           call. = FALSE)
+    }
+    out <- data.frame(data, results[match(ids, rownames(results)), ],
+                      row.names = NULL, check.names = FALSE)
+  }
+  if (!is.null(file)) {
+    write.table(out, file = file, sep = sep, row.names = FALSE,
+                fileEncoding = "UTF-8")
+    message("selection written to ", file)
+    return(invisible(out))
+  }
+  out
+}
+```
+
+```{r examples-export_selection}
+prepared_data <- prepare_input(
+  salmonella_strains,
+  col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT"
+)
+res <- select_strains(prepared_data, n_max = 20, seed = 1)
+selection <- export_selection(res, data = salmonella_strains, id = "IDENTIFIANT")
+# the strains to sequence, with all their metadata
+head(selection[selection$selected, c("IDENTIFIANT", "REGION", "status")])
+# write the table to a CSV file
+export_selection(res, data = salmonella_strains, id = "IDENTIFIANT",
+                 file = file.path(tempdir(), "selection.csv"))
+```
+
+```{r tests-export_selection}
+test_that("export_selection adds the selection to the original metadata", {
+  pd <- suppressMessages(prepare_input(
+    salmonella_strains, col_select = c("CONTEXTE", "REGION", "SECTEUR"),
+    id = "IDENTIFIANT"
+  ))
+  res <- select_strains(pd, n_max = 15, seed = 1)
+  out <- export_selection(res, data = salmonella_strains, id = "IDENTIFIANT")
+  expect_equal(nrow(out), nrow(salmonella_strains))
+  expect_equal(out$IDENTIFIANT, salmonella_strains$IDENTIFIANT)
+  expect_equal(ncol(out), ncol(salmonella_strains) + 6)
+  expect_equal(sum(out$selected), 15)
+  expect_setequal(out$IDENTIFIANT[out$selected], res$selected)
+  # without data: only the metadata used for the selection
+  out_small <- export_selection(res)
+  expect_equal(names(out_small)[1:4], c("id", "CONTEXTE", "REGION", "SECTEUR"))
+  # CSV file
+  file <- tempfile(fileext = ".csv")
+  expect_message(export_selection(res, salmonella_strains, "IDENTIFIANT", file = file),
+                 "written")
+  back <- read.csv(file, sep = ";", encoding = "UTF-8")
+  expect_equal(nrow(back), 100)
+  expect_equal(sum(back$selected), 15)
+  expect_error(export_selection(list()), "select_strains")
+  expect_error(export_selection(res, salmonella_strains, id = "REGION"), "check `id`")
+})
+```
+
+## Reporting: report_selection
+
+`report_selection()` writes an HTML report of the selection: the parameters,
+the silhouette curve with the optimum and the budget, the list of the
+selected strains, the optimal groups that are not represented and the size of
+each cluster. Together with the CSV file of `export_selection()`, it documents
+the choice of the strains to sequence.
+
+```{r function-report_selection}
+#' Write an HTML report of the strain selection
+#'
+#' Renders an HTML report of a selection made with [select_strains()]:
+#' parameters and summary, silhouette curve with the optimal number of
+#' clusters and the maximum number of strains, list of the selected strains
+#' (with their metadata), optimal groups that are not represented, sizes of
+#' the clusters and description of the columns of the CSV file (which ones
+#' were used for the selection). Requires the {rmarkdown} package and pandoc.
+#'
+#' @param x An object returned by [select_strains()].
+#' @param file Path of the HTML file to write.
+#' @param data The original metadata table, or `NULL` to show only the
+#'   metadata used for the selection (see [export_selection()]).
+#' @param id Name or position of the column of `data` containing the strain
+#'   identifiers.
+#' @param title Title of the report.
+#' @param csv If `TRUE` (default), the table of [export_selection()] is also
+#'   written as a CSV file next to the report (same name, `.csv` extension).
+#'
+#' @return The path of the HTML report, invisibly.
+#' @export
+#' @family clustering method
+#'
+#' @examples
+report_selection <- function(x, file = "strain_selection_report.html",
+                             data = NULL, id = 1,
+                             title = "Selection of strains to sequence",
+                             csv = TRUE) {
+  if (!inherits(x, "strainselect_selection")) {
+    stop("`x` must be the result of select_strains()", call. = FALSE)
+  }
+  if (!requireNamespace("rmarkdown", quietly = TRUE)) {
+    stop("the rmarkdown package is needed to write the report", call. = FALSE)
+  }
+  table <- export_selection(x, data = data, id = id)
+  id_column <- if (is.null(data)) "id" else names(table)[column_position(data, id, "id")]
+  if (csv) {
+    csv_file <- sub("\\.html?$", "", file)
+    csv_file <- paste0(csv_file, ".csv")
+    export_selection(x, data = data, id = id, file = csv_file)
+  }
+  template <- system.file("rmarkdown", "selection_report.Rmd",
+                          package = "strainselect")
+  out_dir <- dirname(normalizePath(file, mustWork = FALSE))
+  dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+  work_dir <- tempfile("strainselect_report")
+  dir.create(work_dir)
+  rmd <- file.path(work_dir, "selection_report.Rmd")
+  file.copy(template, rmd)
+  # the report may be rendered inside another document (e.g. a vignette)
+  old_options <- options(knitr.duplicate.label = "allow")
+  on.exit(options(old_options), add = TRUE)
+  rmarkdown::render(
+    rmd,
+    output_file = basename(file),
+    output_dir = out_dir,
+    intermediates_dir = work_dir,
+    params = list(selection = x, table = table, id_column = id_column,
+                  title = title),
+    envir = new.env(),
+    quiet = TRUE
+  )
+  out <- file.path(out_dir, basename(file))
+  message("report written to ", out)
+  invisible(out)
+}
+```
+
+```{r examples-report_selection}
+prepared_data <- prepare_input(
+  salmonella_strains,
+  col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT"
+)
+res <- select_strains(prepared_data, n_max = 20, seed = 1)
+if (requireNamespace("rmarkdown", quietly = TRUE) && rmarkdown::pandoc_available()) {
+  report_selection(res, file = file.path(tempdir(), "selection.html"),
+                   data = salmonella_strains, id = "IDENTIFIANT")
+}
+```
+
+```{r tests-report_selection}
+test_that("report_selection writes an HTML report and a CSV file", {
+  skip_if_not_installed("rmarkdown")
+  skip_if_not(rmarkdown::pandoc_available())
+  pd <- suppressMessages(prepare_input(
+    salmonella_strains, col_select = c("CONTEXTE", "REGION", "SECTEUR"),
+    id = "IDENTIFIANT"
+  ))
+  res <- select_strains(pd, n_max = 10, seed = 1)
+  file <- file.path(tempdir(), "report_test.html")
+  suppressMessages(report_selection(res, file = file, data = salmonella_strains,
+                                    id = "IDENTIFIANT"))
+  expect_true(file.exists(file))
+  expect_true(file.exists(file.path(tempdir(), "report_test.csv")))
+  # pandoc wraps long lines: compare with single spaces
+  html <- gsub("\\s+", " ", paste(readLines(file, warn = FALSE), collapse = " "))
+  expect_match(html, "Selection of strains to sequence")
+  expect_match(html, res$selected[1])
+  # the report tells which columns of the CSV file were used
+  expect_match(html, "Used for the selection")
+  expect_match(html, "not used for the selection")
+  expect_match(html, "SEROTYPE")
+  expect_match(html, "Strain identifier</strong>: <code>IDENTIFIANT")
+  # factual statement on the heterogeneity of the clusters
+  expect_match(html, "strains have the same metadata as the selected strain of their cluster")
+  expect_error(report_selection(list()), "select_strains")
+  # supplementary strains: number with the same metadata as a selected strain
+  res_supp <- select_strains(pd, seed = 1)
+  res_supp <- select_strains(pd, n_max = res_supp$k_opt + 5, seed = 1)
+  file_supp <- file.path(tempdir(), "report_supp.html")
+  suppressMessages(report_selection(res_supp, file = file_supp))
+  html_supp <- gsub("\\s+", " ", paste(readLines(file_supp, warn = FALSE), collapse = " "))
+  expect_match(html_supp, "of the 5 supplementary strains have the same metadata as an already selected strain")
+})
+
+test_that("report_selection works with the profile method", {
+  skip_if_not_installed("rmarkdown")
+  skip_if_not(rmarkdown::pandoc_available())
+  pd <- suppressMessages(prepare_input(
+    salmonella_strains, col_select = c("CONTEXTE", "REGION", "SECTEUR"),
+    id = "IDENTIFIANT"
+  ))
+  for (n_max in c(5, 40)) {
+    res <- select_strains(pd, n_max = n_max, method = "profile", seed = 1)
+    file <- file.path(tempdir(), paste0("report_profile_", n_max, ".html"))
+    suppressMessages(report_selection(res, file = file, data = salmonella_strains,
+                                      id = "IDENTIFIANT"))
+    html <- gsub("\\s+", " ", paste(readLines(file, warn = FALSE), collapse = " "))
+    expect_match(html, "profile method")
+    expect_match(html, "Groups of identical strains")
+    expect_match(html, res$selected[1])
+  }
+})
+```
+
+# Profile method
+
+This method groups strains that are strictly identical for all the selected
+metadata, and selects one strain per group. Unlike the clustering method, all
+strains of a group are identical, and strains that are similar to no other
+strain form a group on their own. It uses three functions: `prepare_upset()`,
+`define_profiles()` and `select_profiles()`.
+
+## Binary table: prepare_upset
+
+`prepare_upset()` creates a binary table from the prepared data: there is one
+column per modality of each metadata (named `<metadata> _ <modality>`), filled
+with 1 if the strain has this modality and 0 otherwise.
+
+```{r function-prepare_upset}
+#' Build the binary table of metadata modalities
+#'
+#' Creates one column per modality of each metadata, filled with 1 when the
+#' strain has this modality and 0 otherwise. The result can be used to draw an
+#' UpSet plot (e.g. with `UpSetR::upset()`) and to define profiles with
+#' [define_profiles()].
+#'
+#' @param prepared_data A data frame with one row per strain, as returned by
+#'   [prepare_input()].
+#'
+#' @return A data frame with the same row names as `prepared_data` and one
+#'   numeric (0/1) column per modality, named `"<metadata> _ <modality>"`.
+#'   Modalities appear in their order of first appearance.
+#' @export
+#' @family profile method
 #'
 #' @examples
 prepare_upset<- function(prepared_data){
- upset_data <- data.frame(row.names = rownames(prepared_data))
- metadata <- colnames(prepared_data)
- for (i in 1:ncol(prepared_data)){
-   vect <- unique(prepared_data[,i])
-   tab <- matrix(0,nrow(prepared_data),length(vect))
-   col.names <- NULL
-   for (j in 1:length(vect)){
-     col.names <- c(col.names,paste(metadata[i],"_",vect[j]))
-     for (k in 1:nrow(prepared_data)){
-       if (!is.na(prepared_data[k,i])){
-         if(prepared_data[k,i]==vect[j]){
-           tab[k,j] <- 1
-         }
-       }
-     }
-   }
-   colnames(tab) <- col.names
-   upset_data <- cbind(upset_data,tab)
- } 
- upset_data
+  upset_data <- data.frame(row.names = rownames(prepared_data))
+  metadata <- colnames(prepared_data)
+  for (i in seq_along(prepared_data)){
+    x <- as.character(prepared_data[[i]])
+    vect <- unique(prepared_data[[i]])
+    tab <- 1 * outer(x, as.character(vect), "==")
+    tab[is.na(tab)] <- 0
+    colnames(tab) <- paste(metadata[i], "_", vect)
+    upset_data <- cbind(upset_data, tab)
+  }
+  upset_data
 }
 
 ```
 
 ```{r examples-prepare_upset}
-# Example with your dataset in "inst/"
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-# Apply my function
-prepare_upset(prepared_data)
+raw_data <- salmonella_strains
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
+upset_data <- prepare_upset(prepared_data)
+upset_data[1:5, 1:4]
 ```
 
-# define_profile function
+The binary table can be used to visualise the groups of identical strains in
+an UpSet plot, for instance with the {UpSetR} package:
 
-```{=html}
-<!--
-This function uses the output of pepare_upset function to create a new data frame with a column "profiles" resulting  from the concatenation of the columns of the input data frame and a colonne that identify the group of the strain. 
-Strain are grouped by identical profiles which allows to consider also the strains with a unique profile.
--->
+```{r upset-plot, eval = requireNamespace("UpSetR", quietly = TRUE), fig.width = 9, fig.height = 5}
+# the 12 most frequent modalities
+UpSetR::upset(upset_data, nsets = 12, order.by = "freq", nintersects = 20,
+              mb.ratio = c(0.55, 0.45), text.scale = 1.1)
 ```
+
+```{r tests-prepare_upset}
+test_that("prepare_upset builds a binary table with one column per modality", {
+  prepared_data <- data.frame(
+    HOST = factor(c("pig", "cattle", "pig")),
+    COUNTRY = factor(c("FR", "FR", "IT")),
+    row.names = c("s1", "s2", "s3")
+  )
+  upset <- prepare_upset(prepared_data)
+  expect_equal(rownames(upset), c("s1", "s2", "s3"))
+  expect_equal(colnames(upset),
+               c("HOST _ pig", "HOST _ cattle", "COUNTRY _ FR", "COUNTRY _ IT"))
+  expect_equal(upset[["HOST _ pig"]], c(1, 0, 1))
+  expect_equal(upset[["COUNTRY _ IT"]], c(0, 0, 1))
+  # each strain has exactly one modality per metadata
+  expect_true(all(rowSums(upset) == ncol(prepared_data)))
+})
+```
+
+## Groups of identical strains: define_profiles
+
+`define_profiles()` builds a profile for each strain by concatenating the
+columns of the binary table. Strains with identical profiles are put in the
+same group; a profile shared by no other strain forms a group with a single
+strain.
+
 ```{r function-define_profiles}
-#' define_profiles
+#' Group strains with identical profiles
 #'
-#' @param data a data frame
-#' @param sep  Separator to use between values
+#' Concatenates the columns of the binary table into one profile per strain
+#' and gives the same group number to strains with identical profiles.
 #'
-#' @return a data frame
+#' @param data A data frame with one row per strain, typically the binary
+#'   table returned by [prepare_upset()].
+#' @param sep Separator used between values when building the profiles
+#'   (none by default).
+#'
+#' @return A data frame with the same row names as `data` and three columns:
+#'   \describe{
+#'     \item{profiles}{the profile of the strain (concatenated values);}
+#'     \item{group}{an integer identifying the group of identical profiles;}
+#'     \item{names}{the strain identifier.}
+#'   }
 #' @export
-#' @importFrom tidyr unite
+#' @family profile method
 #'
 #' @examples
 define_profiles <- function (data, sep = ""){
-  profiles <- unite(data,"profiles",c(1:ncol(data)), sep = sep)
-  profiles_freq <- as.data.frame(table(profiles))
-  profiles_freq$group <- c(1:nrow(profiles_freq))
-  n=nrow(profiles)
-  for (i in 1:n){
-    for (j in 1:nrow(profiles_freq)){
-      if (profiles$profiles[i]==profiles_freq$profiles[j]){
-        profiles$group[i]<-profiles_freq$group[j]
-      }
-    }
-  }
-  profiles$names<-rownames(profiles)
-  
+  profiles <- data.frame(profiles = do.call(paste, c(unname(as.list(data)), sep = sep)),
+                         row.names = rownames(data))
+  profiles$group <- as.integer(factor(profiles$profiles))
+  profiles$names <- rownames(profiles)
   profiles
-} 
+}
 ```
 
-```{r examples-define_profile}
-# Example with your dataset in "inst/"
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
+```{r examples-define_profiles}
+raw_data <- salmonella_strains
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 upset_data <- prepare_upset(prepared_data)
-# Apply my function
-define_profiles(upset_data)
+upset_profiles <- define_profiles(upset_data)
+# number of distinct profiles
+max(upset_profiles$group)
 ```
 
-# select_profiles function
-
-```{=html}
-<!--
-Because the define_profiles function groups strains by identical profile, select_profiles function randomly choose one strain of each group. 
--->
+```{r tests-define_profiles}
+test_that("define_profiles gives the same group to identical profiles", {
+  upset <- data.frame(
+    A = c(1, 1, 0, 1),
+    B = c(0, 0, 1, 0),
+    C = c(1, 1, 1, 0),
+    row.names = c("s1", "s2", "s3", "s4")
+  )
+  profiles <- define_profiles(upset)
+  expect_equal(colnames(profiles), c("profiles", "group", "names"))
+  expect_equal(profiles$profiles, c("101", "101", "011", "100"))
+  expect_equal(profiles$names, c("s1", "s2", "s3", "s4"))
+  expect_equal(profiles$group[1], profiles$group[2])
+  expect_equal(length(unique(profiles$group)), 3)
+  expect_equal(define_profiles(upset, sep = "-")$profiles[1], "1-0-1")
+})
 ```
+
+## Selecting the strains: select_profiles
+
+Finally, `select_profiles()` selects one strain per group. A group containing
+a single strain gets this strain; since all strains of a larger group are
+identical, one of them is chosen at random. Use `seed` to make the selection
+reproducible.
+
 ```{r function-select_profiles}
-#' select_profiles
+#' Select one strain per group of identical profiles
 #'
-#' @param profiles a data frame
-#' @param prepared_data a data frame
+#' Selects at random one strain in each group defined by [define_profiles()].
 #'
-#' @return a data frame
+#' @param profiles A data frame returned by [define_profiles()].
+#' @param prepared_data A data frame with one row per strain, as returned by
+#'   [prepare_input()], with rows in the same order as `profiles`.
+#' @param seed An integer passed to [set.seed()] to make the random choice of
+#'   the representative strains reproducible, or `NULL` (default) to leave the
+#'   random number generator untouched.
+#'
+#' @return `prepared_data` with three additional columns:
+#'   \describe{
+#'     \item{group}{the group of identical profiles of the strain;}
+#'     \item{size}{the number of strains in this group;}
+#'     \item{selected}{the identifier of the strain selected for this group.}
+#'   }
+#'   The selected strains are given by `unique(result$selected)`.
 #' @export
+#' @family profile method
 #'
 #' @examples
-select_profiles <- function(profiles, prepared_data){
+select_profiles <- function(profiles, prepared_data, seed = NULL){
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   selected_data <- prepared_data
   selected_data$group <- profiles$group
   selected_data$size <- as.vector(table(profiles$group)[as.character(profiles$group)])
-  k<- max(profiles$group)
-  n=nrow(selected_data)
-  selection <-rep(NA,k)
-  for (j in 1:k){
-      selection[j] <-sample(profiles$names[profiles$group==j],1)
-  }
-  for (i in 1:n){
-    for (j in 1:k){
-      if (selected_data$group[i]==j){
-        selected_data$selected[i] <- selection[j]
-      }
-    }
-  }
+  selection <- vapply(split(profiles$names, profiles$group),
+                      function(x) x[sample.int(length(x), 1)], character(1))
+  selected_data$selected <- unname(selection[as.character(profiles$group)])
   selected_data
 }
 ```
 
-```{r examples-select_profile}
-# Example with your dataset in "inst/"
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-upset_data <- prepare_upset(prepared_data)
-upset_profiles <- define_profiles(upset_data)
-# Apply my function
-select_profiles(upset_profiles,prepared_data)
+```{r examples-select_profiles}
+raw_data <- salmonella_strains
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
+upset_profiles <- define_profiles(prepare_upset(prepared_data))
+selection <- select_profiles(upset_profiles, prepared_data, seed = 1)
+# one strain per distinct profile
+length(unique(selection$selected))
 ```
 
 ```{r tests-select_profiles}
 test_that("define_profiles and select_profiles select one strain per profile", {
-  datafile <- system.file("data_test.csv", package = "strainselect")
-  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
-  capture.output(
-    prepared_data <- prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+  raw_data <- salmonella_strains
+  prepared_data <- suppressMessages(
+    prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
   )
   profiles <- define_profiles(prepare_upset(prepared_data))
   n_groups <- length(unique(profiles$profiles))
@@ -502,6 +1732,10 @@ test_that("define_profiles and select_profiles select one strain per profile", {
   selected <- select_profiles(profiles, prepared_data)
   expect_equal(length(unique(selected$selected)), n_groups)
   expect_equal(sum(selected$size[!duplicated(selected$group)]), nrow(prepared_data))
+  # each selected strain has the profile of the group it represents
+  expect_equal(profiles[selected$selected, "group"], selected$group)
+  expect_identical(select_profiles(profiles, prepared_data, seed = 1),
+                   select_profiles(profiles, prepared_data, seed = 1))
 })
 ```
 
@@ -510,12 +1744,3 @@ test_that("define_profiles and select_profiles select one strain per profile", {
 # Execute in the console directly
 fusen::inflate(flat_file = "dev/flat_full.Rmd", vignette_name = "Get started")
 ```
-
-# Inflate your package
-
-You're one inflate from paper to box. Build your package from this very Rmd using `fusen::inflate()`
-
--   Verify your `"DESCRIPTION"` file has been updated
--   Verify your function is in `"R/"` directory
--   Verify your test is in `"tests/testthat/"` directory
--   Verify this Rmd appears in `"vignettes/"` directory

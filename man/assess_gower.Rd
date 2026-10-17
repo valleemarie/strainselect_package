@@ -2,29 +2,53 @@
 % Please edit documentation in R/assess_gower.R
 \name{assess_gower}
 \alias{assess_gower}
-\title{assess_gower}
+\title{Compute Gower distances and the hierarchical clustering tree}
+\source{
+Adapted from the dissimilarity matrix and agglomerative clustering
+steps of Anastasia Reusova's tutorial:
+Reusova A. (2018). \emph{Hierarchical Clustering on Categorical Data in R}.
+Towards Data Science.
+\url{https://medium.com/@anastasia.reusova/hierarchical-clustering-on-categorical-data-in-r-a27e578f2995}.
+Code: \url{https://github.com/khunreus/cluster-categorical}.
+}
 \usage{
 assess_gower(clean_data, weights = rep.int(1, p), graph = TRUE)
 }
 \arguments{
-\item{clean_data}{a dataframe}
+\item{clean_data}{A data frame of factors, one row per strain, as returned
+by \code{\link[=prepare_input]{prepare_input()}}.}
 
-\item{weights}{a vector}
+\item{weights}{Numeric vector of weights, one per column of \code{clean_data},
+to give more or less importance to each metadata. Defaults to equal
+weights.}
 
-\item{graph}{a boolean}
+\item{graph}{If \code{TRUE} (default), the dendrogram is plotted.}
 }
 \value{
-a list containing the components clean_data, gower_dist, aggl.clust.c
+A list with two components:
+\describe{
+\item{gower_dist}{the Gower dissimilarity matrix, an object of class
+\code{dissimilarity} / \code{dist} (see \code{\link[cluster:daisy]{cluster::daisy()}});}
+\item{aggl.clust.c}{the clustering tree, an object of class \code{hclust}.}
+}
 }
 \description{
-assess_gower
+Computes the Gower dissimilarity between strains (suited to categorical
+metadata) and performs an agglomerative hierarchical clustering with
+complete linkage.
 }
 \examples{
-# Example with your dataset in "inst/"
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-# Apply my function
-assess_gower(prepared_data, graph = TRUE)
+raw_data <- salmonella_strains
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
+gower <- assess_gower(prepared_data, graph = TRUE)
 }
+\seealso{
+Other clustering method: 
+\code{\link{cstats_table}()},
+\code{\link{export_selection}()},
+\code{\link{report_selection}()},
+\code{\link{select_silhouette}()},
+\code{\link{select_strains}()}
+}
+\concept{clustering method}

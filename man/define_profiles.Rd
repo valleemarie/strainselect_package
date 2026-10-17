@@ -2,28 +2,42 @@
 % Please edit documentation in R/define_profiles.R
 \name{define_profiles}
 \alias{define_profiles}
-\title{define_profiles}
+\title{Group strains with identical profiles}
 \usage{
 define_profiles(data, sep = "")
 }
 \arguments{
-\item{data}{a data frame}
+\item{data}{A data frame with one row per strain, typically the binary
+table returned by \code{\link[=prepare_upset]{prepare_upset()}}.}
 
-\item{sep}{Separator to use between values}
+\item{sep}{Separator used between values when building the profiles
+(none by default).}
 }
 \value{
-a data frame
+A data frame with the same row names as \code{data} and three columns:
+\describe{
+\item{profiles}{the profile of the strain (concatenated values);}
+\item{group}{an integer identifying the group of identical profiles;}
+\item{names}{the strain identifier.}
+}
 }
 \description{
-define_profiles
+Concatenates the columns of the binary table into one profile per strain
+and gives the same group number to strains with identical profiles.
 }
 \examples{
-# Example with your dataset in "inst/"
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = TRUE)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
+raw_data <- salmonella_strains
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 upset_data <- prepare_upset(prepared_data)
-# Apply my function
-define_profiles(upset_data)
+upset_profiles <- define_profiles(upset_data)
+# number of distinct profiles
+max(upset_profiles$group)
 }
+\seealso{
+Other profile method: 
+\code{\link{prepare_upset}()},
+\code{\link{select_profiles}()},
+\code{\link{select_strains}()}
+}
+\concept{profile method}
