@@ -1,0 +1,111 @@
+# Clustering statistics for an increasing number of clusters
+
+Cuts the clustering tree into `step`, `2 * step`, ..., `k` clusters and
+computes, for each number of clusters, the statistics of
+[`fpc::cluster.stats()`](https://rdrr.io/pkg/fpc/man/cluster.stats.html).
+The average silhouette width can be plotted to help choosing the number
+of clusters.
+
+## Usage
+
+``` r
+cstats_table(dist, tree, k, step, graph_silhouette = TRUE, l)
+```
+
+## Source
+
+Adapted from the `cstats.table()` function and the silhouette plot of
+Anastasia Reusova's tutorial: Reusova A. (2018). *Hierarchical
+Clustering on Categorical Data in R*. Towards Data Science.
+<https://medium.com/@anastasia.reusova/hierarchical-clustering-on-categorical-data-in-r-a27e578f2995>.
+Code: <https://github.com/khunreus/cluster-categorical>.
+
+## Arguments
+
+- dist:
+
+  A dissimilarity object, e.g. `gower_dist` returned by
+  [`assess_gower()`](https://lguillier.github.io/strainselect_package/reference/assess_gower.md).
+
+- tree:
+
+  An `hclust` object, e.g. `aggl.clust.c` returned by
+  [`assess_gower()`](https://lguillier.github.io/strainselect_package/reference/assess_gower.md).
+
+- k:
+
+  Largest number of clusters to test. Must be a multiple of `step`.
+
+- step:
+
+  Increment between two numbers of clusters tested.
+
+- graph_silhouette:
+
+  If `TRUE` (default), the average silhouette width is plotted against
+  the number of clusters.
+
+- l:
+
+  Deprecated, use `step` instead.
+
+## Value
+
+A data frame with one row per number of clusters tested (row names
+`Test <number of clusters>`) and the columns `cluster.number`, `n`,
+`within.cluster.ss`, `average.within`, `average.between`, `wb.ratio`,
+`dunn2`, `avg.silwidth` (see
+[`fpc::cluster.stats()`](https://rdrr.io/pkg/fpc/man/cluster.stats.html)),
+followed by cluster size columns. Values are rounded to 2 decimals.
+
+## See also
+
+Other clustering method:
+[`assess_gower()`](https://lguillier.github.io/strainselect_package/reference/assess_gower.md),
+[`export_selection()`](https://lguillier.github.io/strainselect_package/reference/export_selection.md),
+[`report_selection()`](https://lguillier.github.io/strainselect_package/reference/report_selection.md),
+[`select_silhouette()`](https://lguillier.github.io/strainselect_package/reference/select_silhouette.md),
+[`select_strains()`](https://lguillier.github.io/strainselect_package/reference/select_strains.md)
+
+## Examples
+
+``` r
+raw_data <- salmonella_strains
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
+#> no duplicate ID
+#> selected metadata: CONTEXTE, MATRICE1, REGION, SECTEUR, LIEUPVT, ANNEE
+gower <- assess_gower(prepared_data, graph = FALSE)
+stats <- cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c,
+                      k = 60, step = 2)
+#> testing 2 clusters
+#> testing 4 clusters
+#> testing 6 clusters
+#> testing 8 clusters
+#> testing 10 clusters
+#> testing 12 clusters
+#> testing 14 clusters
+#> testing 16 clusters
+#> testing 18 clusters
+#> testing 20 clusters
+#> testing 22 clusters
+#> testing 24 clusters
+#> testing 26 clusters
+#> testing 28 clusters
+#> testing 30 clusters
+#> testing 32 clusters
+#> testing 34 clusters
+#> testing 36 clusters
+#> testing 38 clusters
+#> testing 40 clusters
+#> testing 42 clusters
+#> testing 44 clusters
+#> testing 46 clusters
+#> testing 48 clusters
+#> testing 50 clusters
+#> testing 52 clusters
+#> testing 54 clusters
+#> testing 56 clusters
+#> testing 58 clusters
+#> testing 60 clusters
+```
