@@ -3,7 +3,8 @@
 test_that("define_profiles and select_profiles select one strain per profile", {
   raw_data <- salmonella_strains
   prepared_data <- suppressMessages(
-    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+    prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
   )
   profiles <- define_profiles(prepare_upset(prepared_data))
   n_groups <- length(unique(profiles$profiles))

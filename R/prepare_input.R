@@ -39,8 +39,8 @@
 #' )
 #' head(prepared_data)
 #' # the same with column positions
-#' prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-#'                                id = 1, date = 17)
+#' prepared_data <- prepare_input(raw_data, col_select = c(5, 8, 11, 12, 15, 22),
+#'                                id = 1, date = 15)
 prepare_input <- function (data, col_select = seq_len(ncol(data)), id = 1, date = NULL,
                            month = FALSE, year = TRUE, date_format = "%d/%m/%Y",
                            m, a) {

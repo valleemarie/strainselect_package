@@ -22,6 +22,9 @@
 * New dataset `salmonella_strains` (the example table, available as soon as
   the package is loaded); the examples, the vignette and the README use it.
   The CSV file `data_test.csv` is kept to show the expected input format.
+* The columns `REF_PARTENAIRE` and `LABORATORY_CODE` (partner laboratory
+  information) are removed from the example data, which now has 22 columns.
+  The examples use column names rather than positions.
 * `citation("strainselect")` gives the reference of the package; a
   `CITATION.cff` file adds a "Cite this repository" button on GitHub.
 * The old `How_to_use_Strainselect/` folder and `.Rhistory` are removed from

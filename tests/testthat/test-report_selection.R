@@ -20,7 +20,7 @@ test_that("report_selection writes an HTML report and a CSV file", {
   # the report tells which columns of the CSV file were used
   expect_match(html, "Used for the selection")
   expect_match(html, "not used for the selection")
-  expect_match(html, "REF_PARTENAIRE")
+  expect_match(html, "SEROTYPE")
   expect_match(html, "Strain identifier</strong>: <code>IDENTIFIANT")
   expect_error(report_selection(list()), "select_strains")
 })

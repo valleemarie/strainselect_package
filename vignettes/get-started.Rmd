@@ -44,7 +44,7 @@ year...). It offers two complementary methods:
 Both methods start with `prepare_input()`, which cleans the raw table.
 
 The examples below use `salmonella_strains`, a table of 100 *Salmonella*
-strains described by 24 variables, shipped with the package. The selection is
+strains described by 22 variables, shipped with the package. The selection is
 based on 6 variables: `CONTEXTE`, `MATRICE1`, `REGION`, `SECTEUR`, `LIEUPVT`
 and the year extracted from `DATE_PRELEVEMENT`.
 
@@ -87,8 +87,8 @@ prepared_data <- prepare_input(
 )
 head(prepared_data)
 # the same with column positions
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c(5, 8, 11, 12, 15, 22),
+                               id = 1, date = 15)
 ```
 
 # Clustering method
@@ -107,8 +107,8 @@ dendrogram is drawn when `graph = TRUE`.
 
 ```{r examples-assess_gower}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 gower <- assess_gower(prepared_data, graph = TRUE)
 ```
 
@@ -124,8 +124,8 @@ sequenced; a larger `step` reduces the computing time.
 
 ```{r examples-cstats_table}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 gower <- assess_gower(prepared_data, graph = FALSE)
 stats <- cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c,
                       k = 50, step = 10)
@@ -143,8 +143,8 @@ at random; use `seed` to make this choice reproducible.
 
 ```{r examples-select_silhouette}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 gower <- assess_gower(prepared_data, graph = FALSE)
 selection <- select_silhouette(prepared_data, dist = gower$gower_dist, k = 20,
                                seed = 1)
@@ -259,8 +259,8 @@ with 1 if the strain has this modality and 0 otherwise.
 
 ```{r examples-prepare_upset}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 upset_data <- prepare_upset(prepared_data)
 upset_data[1:5, 1:4]
 ```
@@ -283,8 +283,8 @@ strain.
 
 ```{r examples-define_profiles}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 upset_data <- prepare_upset(prepared_data)
 upset_profiles <- define_profiles(upset_data)
 # number of distinct profiles
@@ -300,8 +300,8 @@ reproducible.
 
 ```{r examples-select_profiles}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 upset_profiles <- define_profiles(prepare_upset(prepared_data))
 selection <- select_profiles(upset_profiles, prepared_data, seed = 1)
 # one strain per distinct profile

@@ -18,8 +18,8 @@
 #'
 #' @examples
 #' raw_data <- salmonella_strains
-#' prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-#'                                id = 1, date = 17)
+#' prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+#'                                id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 #' upset_data <- prepare_upset(prepared_data)
 #' upset_data[1:5, 1:4]
 prepare_upset<- function(prepared_data){

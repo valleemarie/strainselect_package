@@ -7,12 +7,9 @@
 #' examples of the package. Column names and values are in French, as in the
 #' original database.
 #'
-#' @format A data frame with 100 rows (one per strain) and 24 columns:
+#' @format A data frame with 100 rows (one per strain) and 22 columns:
 #'   \describe{
 #'     \item{IDENTIFIANT}{strain identifier (unique);}
-#'     \item{REF_PARTENAIRE}{reference of the strain at the partner
-#'       laboratory;}
-#'     \item{LABORATORY_CODE}{code of the partner laboratory;}
 #'     \item{SEROTYPE}{serotype of the strain;}
 #'     \item{COMMENTAIRE}{free-text description of the sample;}
 #'     \item{SAMPLETYPE}{type of sample;}

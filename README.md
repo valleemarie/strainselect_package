@@ -51,7 +51,7 @@ remotes::install_github("lguillier/strainselect_package", build_vignettes = TRUE
 ## Example
 
 The package ships with `salmonella_strains`, an example table of 100
-*Salmonella* strains described by 24 variables. We base the selection on
+*Salmonella* strains described by 22 variables. We base the selection on
 6 of them and on the year of sampling.
 
 ``` r

@@ -3,7 +3,8 @@
 test_that("cstats_table returns the cluster stats table", {
   raw_data <- salmonella_strains
   prepared_data <- suppressMessages(
-    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+    prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
   )
   gower <- assess_gower(prepared_data, graph = FALSE)
   expect_message(

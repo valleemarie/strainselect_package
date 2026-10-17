@@ -55,8 +55,8 @@ random.
 }
 \examples{
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 gower <- assess_gower(prepared_data, graph = FALSE)
 selection <- select_silhouette(prepared_data, dist = gower$gower_dist, k = 20,
                                seed = 1)

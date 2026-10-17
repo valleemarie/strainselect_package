@@ -38,7 +38,7 @@ year...). It offers two complementary methods:
 Both methods start with `prepare_input()`, which cleans the raw table.
 
 The examples below use `salmonella_strains`, a table of 100 *Salmonella*
-strains described by 24 variables, shipped with the package. The selection is
+strains described by 22 variables, shipped with the package. The selection is
 based on 6 variables: `CONTEXTE`, `MATRICE1`, `REGION`, `SECTEUR`, `LIEUPVT`
 and the year extracted from `DATE_PRELEVEMENT`.
 
@@ -57,12 +57,9 @@ format of an input file:
 #' examples of the package. Column names and values are in French, as in the
 #' original database.
 #'
-#' @format A data frame with 100 rows (one per strain) and 24 columns:
+#' @format A data frame with 100 rows (one per strain) and 22 columns:
 #'   \describe{
 #'     \item{IDENTIFIANT}{strain identifier (unique);}
-#'     \item{REF_PARTENAIRE}{reference of the strain at the partner
-#'       laboratory;}
-#'     \item{LABORATORY_CODE}{code of the partner laboratory;}
 #'     \item{SEROTYPE}{serotype of the strain;}
 #'     \item{COMMENTAIRE}{free-text description of the sample;}
 #'     \item{SAMPLETYPE}{type of sample;}
@@ -102,7 +99,7 @@ str(salmonella_strains[, c("IDENTIFIANT", "CONTEXTE", "REGION", "DATE_PRELEVEMEN
 
 ```{r tests-salmonella_strains}
 test_that("salmonella_strains is the table of the CSV file", {
-  expect_equal(dim(salmonella_strains), c(100, 24))
+  expect_equal(dim(salmonella_strains), c(100, 22))
   datafile <- system.file("data_test.csv", package = "strainselect")
   expect_equal(salmonella_strains, read.csv(datafile, sep = ";", header = TRUE,
                                             encoding = "UTF-8"))
@@ -248,8 +245,8 @@ prepared_data <- prepare_input(
 )
 head(prepared_data)
 # the same with column positions
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c(5, 8, 11, 12, 15, 22),
+                               id = 1, date = 15)
 ```
 
 ```{r tests-prepare_input}
@@ -399,8 +396,8 @@ assess_gower <- function(clean_data, weights = rep.int(1, p), graph = TRUE){
 
 ```{r examples-assess_gower}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 gower <- assess_gower(prepared_data, graph = TRUE)
 ```
 
@@ -528,8 +525,8 @@ cstats_table <- function(dist, tree, k, step, graph_silhouette = TRUE, l) {
 
 ```{r examples-cstats_table}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 gower <- assess_gower(prepared_data, graph = FALSE)
 stats <- cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c,
                       k = 50, step = 10)
@@ -540,7 +537,8 @@ stats[, c("cluster.number", "avg.silwidth")]
 test_that("cstats_table returns the cluster stats table", {
   raw_data <- salmonella_strains
   prepared_data <- suppressMessages(
-    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+    prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
   )
   gower <- assess_gower(prepared_data, graph = FALSE)
   expect_message(
@@ -640,8 +638,8 @@ select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(dist, "
 
 ```{r examples-select_silhouette}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 gower <- assess_gower(prepared_data, graph = FALSE)
 selection <- select_silhouette(prepared_data, dist = gower$gower_dist, k = 20,
                                seed = 1)
@@ -653,7 +651,8 @@ unique(selection$selected)
 test_that("select_silhouette selects one strain per cluster without global objects", {
   raw_data <- salmonella_strains
   prepared_data <- suppressMessages(
-    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+    prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
   )
   dist <- assess_gower(prepared_data, graph = FALSE)$gower_dist
   selected <- select_silhouette(prepared_data, dist, k = 10)
@@ -669,7 +668,8 @@ test_that("select_silhouette selects one strain per cluster without global objec
 test_that("select_silhouette is reproducible with seed and checks k", {
   raw_data <- salmonella_strains
   prepared_data <- suppressMessages(
-    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+    prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
   )
   dist <- assess_gower(prepared_data, graph = FALSE)$gower_dist
   expect_identical(select_silhouette(prepared_data, dist, k = 20, seed = 42),
@@ -1237,7 +1237,7 @@ test_that("report_selection writes an HTML report and a CSV file", {
   # the report tells which columns of the CSV file were used
   expect_match(html, "Used for the selection")
   expect_match(html, "not used for the selection")
-  expect_match(html, "REF_PARTENAIRE")
+  expect_match(html, "SEROTYPE")
   expect_match(html, "Strain identifier</strong>: <code>IDENTIFIANT")
   expect_error(report_selection(list()), "select_strains")
 })
@@ -1293,8 +1293,8 @@ prepare_upset<- function(prepared_data){
 
 ```{r examples-prepare_upset}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 upset_data <- prepare_upset(prepared_data)
 upset_data[1:5, 1:4]
 ```
@@ -1365,8 +1365,8 @@ define_profiles <- function (data, sep = ""){
 
 ```{r examples-define_profiles}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 upset_data <- prepare_upset(prepared_data)
 upset_profiles <- define_profiles(upset_data)
 # number of distinct profiles
@@ -1437,8 +1437,8 @@ select_profiles <- function(profiles, prepared_data, seed = NULL){
 
 ```{r examples-select_profiles}
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 upset_profiles <- define_profiles(prepare_upset(prepared_data))
 selection <- select_profiles(upset_profiles, prepared_data, seed = 1)
 # one strain per distinct profile
@@ -1449,7 +1449,8 @@ length(unique(selection$selected))
 test_that("define_profiles and select_profiles select one strain per profile", {
   raw_data <- salmonella_strains
   prepared_data <- suppressMessages(
-    prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
+    prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
   )
   profiles <- define_profiles(prepare_upset(prepared_data))
   n_groups <- length(unique(profiles$profiles))
