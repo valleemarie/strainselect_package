@@ -1,0 +1,16 @@
+bibentry(
+  bibtype = "Manual",
+  title = "{strainselect}: Select Bacterial Strains to Sequence Based on Their Metadata",
+  author = c(
+    person("Marie", "Vallée", comment = c(ORCID = "0000-0002-4233-8400")),
+    person("Laurent", "Guillier", comment = c(ORCID = "0000-0002-7867-2937"))
+  ),
+  year = "2026",
+  note = paste("R package version", meta$Version),
+  url = "https://github.com/lguillier/strainselect_package",
+  textVersion = paste0(
+    "Vallée M, Guillier L (2026). strainselect: Select Bacterial Strains to ",
+    "Sequence Based on Their Metadata. R package version ", meta$Version, ". ",
+    "https://github.com/lguillier/strainselect_package"
+  )
+)

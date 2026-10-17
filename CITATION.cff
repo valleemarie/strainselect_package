@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "strainselect: Select Bacterial Strains to Sequence Based on Their Metadata"
+abstract: >-
+  R package that helps choosing which bacterial strains to sequence from a
+  collection described by categorical metadata, using either a clustering
+  method (Gower distance, hierarchical clustering and silhouette width) or a
+  profile method (one strain per group of strains with identical metadata).
+authors:
+  - family-names: "Vallée"
+    given-names: "Marie"
+    orcid: "https://orcid.org/0000-0002-4233-8400"
+  - family-names: "Guillier"
+    given-names: "Laurent"
+    orcid: "https://orcid.org/0000-0002-7867-2937"
+license: MIT
+repository-code: "https://github.com/lguillier/strainselect_package"
+url: "https://lguillier.github.io/strainselect_package/"
+version: "0.1.0"
+keywords:
+  - R
+  - bioinformatics
+  - microbiology
+  - whole-genome sequencing
+  - strain selection
+  - clustering

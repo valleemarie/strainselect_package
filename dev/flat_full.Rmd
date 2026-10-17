@@ -37,10 +37,78 @@ year...). It offers two complementary methods:
 
 Both methods start with `prepare_input()`, which cleans the raw table.
 
-The examples below use `data_test.csv`, a table of 100 *Salmonella* strains
-described by 24 variables, shipped with the package. The selection is based on
-6 variables: `CONTEXTE`, `MATRICE1`, `REGION`, `SECTEUR`, `LIEUPVT` and the
-year extracted from `DATE_PRELEVEMENT`.
+The examples below use `salmonella_strains`, a table of 100 *Salmonella*
+strains described by 24 variables, shipped with the package. The selection is
+based on 6 variables: `CONTEXTE`, `MATRICE1`, `REGION`, `SECTEUR`, `LIEUPVT`
+and the year extracted from `DATE_PRELEVEMENT`.
+
+# Example data: salmonella_strains
+
+`salmonella_strains` is available as soon as the package is loaded. The same
+table is also shipped as a CSV file (`;` separator), which shows the expected
+format of an input file:
+`system.file("data_test.csv", package = "strainselect")`.
+
+```{r function-salmonella_strains}
+#' Example metadata of 100 *Salmonella* strains
+#'
+#' Metadata of 100 strains of *Salmonella enterica* serotype 1,4,\[5\],12:i:-
+#' (monophasic variant of Typhimurium) collected in France in 2020, used in the
+#' examples of the package. Column names and values are in French, as in the
+#' original database.
+#'
+#' @format A data frame with 100 rows (one per strain) and 24 columns:
+#'   \describe{
+#'     \item{IDENTIFIANT}{strain identifier (unique);}
+#'     \item{REF_PARTENAIRE}{reference of the strain at the partner
+#'       laboratory;}
+#'     \item{LABORATORY_CODE}{code of the partner laboratory;}
+#'     \item{SEROTYPE}{serotype of the strain;}
+#'     \item{COMMENTAIRE}{free-text description of the sample;}
+#'     \item{SAMPLETYPE}{type of sample;}
+#'     \item{CONTEXTE}{sampling context (surveillance, product alert,
+#'       control programme...);}
+#'     \item{PAYS}{country of sampling;}
+#'     \item{MATRICE}{sampled matrix, most detailed level;}
+#'     \item{MATRICE1}{sampled matrix, first level of grouping;}
+#'     \item{MATRICE2}{sampled matrix, second level of grouping;}
+#'     \item{NOM_DEPARTEMENT}{name of the French département of sampling;}
+#'     \item{REGION}{French region of sampling;}
+#'     \item{SECTEUR}{sector (human food, animal health and production,
+#'       ecosystem...);}
+#'     \item{NUMERO_DEPARTEMENT}{number of the French département;}
+#'     \item{CODE_POSTAL}{postal code of the place of sampling;}
+#'     \item{DATE_PRELEVEMENT}{date of sampling (`dd/mm/yyyy`);}
+#'     \item{DATE_RECEPTION}{date of reception at the laboratory
+#'       (`dd/mm/yyyy`);}
+#'     \item{TYPE_ANALYSE}{type of analysis;}
+#'     \item{ATYPIQUE}{flag for atypical strains;}
+#'     \item{TYPE_DE_DONNEES}{type of data;}
+#'     \item{BOX_NUMBER}{storage box of the strain;}
+#'     \item{EMPLACEMENT}{position of the strain in the box;}
+#'     \item{LIEUPVT}{place of sampling in the food chain (farm,
+#'       slaughterhouse, industrial processing...).}
+#'   }
+#' @source Example data provided by the authors. The same table is available
+#'   as a CSV file: `system.file("data_test.csv", package = "strainselect")`.
+#' @family data preparation
+#' @examples
+"salmonella_strains"
+```
+
+```{r examples-salmonella_strains}
+str(salmonella_strains[, c("IDENTIFIANT", "CONTEXTE", "REGION", "DATE_PRELEVEMENT")])
+```
+
+```{r tests-salmonella_strains}
+test_that("salmonella_strains is the table of the CSV file", {
+  expect_equal(dim(salmonella_strains), c(100, 24))
+  datafile <- system.file("data_test.csv", package = "strainselect")
+  expect_equal(salmonella_strains, read.csv(datafile, sep = ";", header = TRUE,
+                                            encoding = "UTF-8"))
+  expect_false(anyDuplicated(salmonella_strains$IDENTIFIANT) > 0)
+})
+```
 
 # Preparing the data: prepare_input
 
@@ -172,8 +240,7 @@ column_position <- function(data, x, arg) {
 ```
 
 ```{r examples-prepare_input}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(
   raw_data,
   col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
@@ -331,8 +398,7 @@ assess_gower <- function(clean_data, weights = rep.int(1, p), graph = TRUE){
 ```
 
 ```{r examples-assess_gower}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 gower <- assess_gower(prepared_data, graph = TRUE)
@@ -461,8 +527,7 @@ cstats_table <- function(dist, tree, k, step, graph_silhouette = TRUE, l) {
 ```
 
 ```{r examples-cstats_table}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 gower <- assess_gower(prepared_data, graph = FALSE)
@@ -473,8 +538,7 @@ stats[, c("cluster.number", "avg.silwidth")]
 
 ```{r tests-cstats_table}
 test_that("cstats_table returns the cluster stats table", {
-  datafile <- system.file("data_test.csv", package = "strainselect")
-  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+  raw_data <- salmonella_strains
   prepared_data <- suppressMessages(
     prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
   )
@@ -575,8 +639,7 @@ select_silhouette <- function (prepared_data, dist, k, isdiss = inherits(dist, "
 ```
 
 ```{r examples-select_silhouette}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 gower <- assess_gower(prepared_data, graph = FALSE)
@@ -588,8 +651,7 @@ unique(selection$selected)
 
 ```{r tests-select_silhouette}
 test_that("select_silhouette selects one strain per cluster without global objects", {
-  datafile <- system.file("data_test.csv", package = "strainselect")
-  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+  raw_data <- salmonella_strains
   prepared_data <- suppressMessages(
     prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
   )
@@ -605,8 +667,7 @@ test_that("select_silhouette selects one strain per cluster without global objec
 })
 
 test_that("select_silhouette is reproducible with seed and checks k", {
-  datafile <- system.file("data_test.csv", package = "strainselect")
-  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+  raw_data <- salmonella_strains
   prepared_data <- suppressMessages(
     prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
   )
@@ -667,8 +728,7 @@ prepare_upset<- function(prepared_data){
 ```
 
 ```{r examples-prepare_upset}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 upset_data <- prepare_upset(prepared_data)
@@ -740,8 +800,7 @@ define_profiles <- function (data, sep = ""){
 ```
 
 ```{r examples-define_profiles}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 upset_data <- prepare_upset(prepared_data)
@@ -813,8 +872,7 @@ select_profiles <- function(profiles, prepared_data, seed = NULL){
 ```
 
 ```{r examples-select_profiles}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 upset_profiles <- define_profiles(prepare_upset(prepared_data))
@@ -825,8 +883,7 @@ length(unique(selection$selected))
 
 ```{r tests-select_profiles}
 test_that("define_profiles and select_profiles select one strain per profile", {
-  datafile <- system.file("data_test.csv", package = "strainselect")
-  raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+  raw_data <- salmonella_strains
   prepared_data <- suppressMessages(
     prepare_input(raw_data, col_select = c(7,10,13,14,17,24), id = 1, date = 17)
   )

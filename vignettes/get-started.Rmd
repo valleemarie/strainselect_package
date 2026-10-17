@@ -43,10 +43,21 @@ year...). It offers two complementary methods:
 
 Both methods start with `prepare_input()`, which cleans the raw table.
 
-The examples below use `data_test.csv`, a table of 100 *Salmonella* strains
-described by 24 variables, shipped with the package. The selection is based on
-6 variables: `CONTEXTE`, `MATRICE1`, `REGION`, `SECTEUR`, `LIEUPVT` and the
-year extracted from `DATE_PRELEVEMENT`.
+The examples below use `salmonella_strains`, a table of 100 *Salmonella*
+strains described by 24 variables, shipped with the package. The selection is
+based on 6 variables: `CONTEXTE`, `MATRICE1`, `REGION`, `SECTEUR`, `LIEUPVT`
+and the year extracted from `DATE_PRELEVEMENT`.
+
+# Example data: salmonella_strains
+
+`salmonella_strains` is available as soon as the package is loaded. The same
+table is also shipped as a CSV file (`;` separator), which shows the expected
+format of an input file:
+`system.file("data_test.csv", package = "strainselect")`.
+
+```{r examples-salmonella_strains}
+str(salmonella_strains[, c("IDENTIFIANT", "CONTEXTE", "REGION", "DATE_PRELEVEMENT")])
+```
 
 # Preparing the data: prepare_input
 
@@ -68,8 +79,7 @@ instance `date_format = "%Y-%m-%d"` for dates such as `2020-01-09`. A date
 column already of class `Date` is used as is.
 
 ```{r examples-prepare_input}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(
   raw_data,
   col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
@@ -96,8 +106,7 @@ clustering with complete linkage is then performed on this matrix, and the
 dendrogram is drawn when `graph = TRUE`.
 
 ```{r examples-assess_gower}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 gower <- assess_gower(prepared_data, graph = TRUE)
@@ -114,8 +123,7 @@ number of clusters without exceeding the number of strains that can be
 sequenced; a larger `step` reduces the computing time.
 
 ```{r examples-cstats_table}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 gower <- assess_gower(prepared_data, graph = FALSE)
@@ -134,8 +142,7 @@ strains share the largest silhouette width in a cluster, one of them is chosen
 at random; use `seed` to make this choice reproducible.
 
 ```{r examples-select_silhouette}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 gower <- assess_gower(prepared_data, graph = FALSE)
@@ -160,8 +167,7 @@ column per modality of each metadata (named `<metadata> _ <modality>`), filled
 with 1 if the strain has this modality and 0 otherwise.
 
 ```{r examples-prepare_upset}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 upset_data <- prepare_upset(prepared_data)
@@ -185,8 +191,7 @@ same group; a profile shared by no other strain forms a group with a single
 strain.
 
 ```{r examples-define_profiles}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 upset_data <- prepare_upset(prepared_data)
@@ -203,8 +208,7 @@ identical, one of them is chosen at random. Use `seed` to make the selection
 reproducible.
 
 ```{r examples-select_profiles}
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 upset_profiles <- define_profiles(prepare_upset(prepared_data))
