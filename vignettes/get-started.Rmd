@@ -132,11 +132,11 @@ stats <- cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c,
 ```
 
 With a small step (here every 2 clusters), the curve shows two plateaus. The
-average silhouette width jumps to about 0.45 at 15–16 clusters and then stays
-around 0.41–0.43 up to about 30 clusters: **about 15 clusters** is a first
+average silhouette width jumps to about 0.45 at 16 clusters and then stays
+between 0.39 and 0.43 up to 30 clusters: **about 15 clusters** is a first
 level that already captures the main structure of the collection. It jumps
-again to about 0.47 at 33–34 clusters and stays around 0.47–0.51 up to about
-52 clusters: **about 33 clusters** is a second, finer level. Beyond, the
+again to about 0.47 at 34 clusters and stays between 0.47 and 0.51 up to 52
+clusters: **about 33 clusters** is a second, finer level. Beyond, the
 curve increases up to the number of distinct profiles (61), where every
 profile is isolated: with categorical metadata, this maximum is not a natural
 level of grouping. The number of strains to sequence can be chosen at one of
