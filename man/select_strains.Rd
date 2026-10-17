@@ -116,6 +116,10 @@ res_profile <- select_strains(prepared_data, n_max = 75, method = "profile", see
 res_profile
 plot(res_profile)
 head(res_profile$groups)
+# profile method, budget smaller than the number of distinct profiles:
+# one strain in each of the 20 largest groups
+res_profile_20 <- select_strains(prepared_data, n_max = 20, method = "profile", seed = 1)
+plot(res_profile_20)
 }
 \seealso{
 Other clustering method: 

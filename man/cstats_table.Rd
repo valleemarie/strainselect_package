@@ -49,8 +49,7 @@ prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", 
                                id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 gower <- assess_gower(prepared_data, graph = FALSE)
 stats <- cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c,
-                      k = 50, step = 10)
-stats[, c("cluster.number", "avg.silwidth")]
+                      k = 60, step = 2)
 }
 \seealso{
 Other clustering method: 
