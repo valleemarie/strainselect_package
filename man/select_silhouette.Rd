@@ -66,6 +66,9 @@ unique(selection$selected)
 \seealso{
 Other clustering method: 
 \code{\link{assess_gower}()},
-\code{\link{cstats_table}()}
+\code{\link{cstats_table}()},
+\code{\link{export_selection}()},
+\code{\link{report_selection}()},
+\code{\link{select_strains}()}
 }
 \concept{clustering method}

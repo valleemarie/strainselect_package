@@ -152,6 +152,97 @@ selection <- select_silhouette(prepared_data, dist = gower$gower_dist, k = 20,
 unique(selection$selected)
 ```
 
+# Selecting strains for a sequencing budget: select_strains
+
+`select_strains()` runs the whole clustering method in one step and answers
+the practical question "*I can sequence at most `n_max` strains: which ones?*".
+
+1. It computes the Gower distances and the clustering tree (as
+   `assess_gower()`), then the average silhouette width for every number of
+   clusters from 2 to the number of distinct profiles. The number of clusters
+   with the largest average silhouette width is the **optimal number of
+   clusters** `k_opt`.
+2. It selects the strains according to the budget `n_max`:
+   - no budget (`n_max = NULL`): one strain per optimal cluster, i.e. `k_opt`
+     strains, with the status `"optimal"`;
+   - budget larger than the optimum (`n_max >= k_opt`): the `k_opt` optimal
+     strains, completed up to `n_max` strains (status `"supplementary"`) by
+     cutting the tree into `n_max` clusters. Use `fill = FALSE` to stop at the
+     optimum. As the clusters are nested, each supplementary strain comes from
+     a cluster that does not contain an optimal strain yet;
+   - budget smaller than the optimum (`n_max < k_opt`): the tree is cut into
+     `n_max` clusters and one strain is selected in each (status
+     `"selected"`). The optimal groups that are not represented by any
+     selected strain are listed, so that the user knows what is missed.
+
+In each cluster, the selected strain is the one with the largest silhouette
+width, i.e. the best clustered one (ties are broken at random, use `seed` for
+reproducibility).
+
+With categorical metadata, identical strains are at distance 0, so the
+optimum is often close to the number of distinct profiles. Supplementary
+strains then mostly have the same metadata as already selected strains: they
+do not add diversity regarding the metadata, but may be useful as replicates.
+
+```{r examples-select_strains}
+prepared_data <- prepare_input(
+  salmonella_strains,
+  col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT"
+)
+# no budget: optimal number of strains
+res <- select_strains(prepared_data, seed = 1)
+res
+plot(res)
+# budget smaller than the optimum
+res_20 <- select_strains(prepared_data, n_max = 20, seed = 1)
+res_20
+head(res_20$table[, c("cluster", "optimal_group", "selected", "status")])
+```
+
+## Exporting the result: export_selection
+
+`export_selection()` returns — and optionally writes to a CSV file — the
+original metadata table with the columns added by `select_strains()`. The file
+can be opened in a spreadsheet and filtered on `selected` to get the list of
+strains to sequence.
+
+```{r examples-export_selection}
+prepared_data <- prepare_input(
+  salmonella_strains,
+  col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT"
+)
+res <- select_strains(prepared_data, n_max = 20, seed = 1)
+selection <- export_selection(res, data = salmonella_strains, id = "IDENTIFIANT")
+# the strains to sequence, with all their metadata
+head(selection[selection$selected, c("IDENTIFIANT", "REGION", "status")])
+# write the table to a CSV file
+export_selection(res, data = salmonella_strains, id = "IDENTIFIANT",
+                 file = file.path(tempdir(), "selection.csv"))
+```
+
+## Reporting: report_selection
+
+`report_selection()` writes an HTML report of the selection: the parameters,
+the silhouette curve with the optimum and the budget, the list of the
+selected strains, the optimal groups that are not represented and the size of
+each cluster. Together with the CSV file of `export_selection()`, it documents
+the choice of the strains to sequence.
+
+```{r examples-report_selection}
+prepared_data <- prepare_input(
+  salmonella_strains,
+  col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT"
+)
+res <- select_strains(prepared_data, n_max = 20, seed = 1)
+if (requireNamespace("rmarkdown", quietly = TRUE) && rmarkdown::pandoc_available()) {
+  report_selection(res, file = file.path(tempdir(), "selection.html"),
+                   data = salmonella_strains, id = "IDENTIFIANT")
+}
+```
+
 # Profile method
 
 This method groups strains that are strictly identical for all the selected

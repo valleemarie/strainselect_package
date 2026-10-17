@@ -46,6 +46,9 @@ gower <- assess_gower(prepared_data, graph = TRUE)
 \seealso{
 Other clustering method: 
 \code{\link{cstats_table}()},
-\code{\link{select_silhouette}()}
+\code{\link{export_selection}()},
+\code{\link{report_selection}()},
+\code{\link{select_silhouette}()},
+\code{\link{select_strains}()}
 }
 \concept{clustering method}

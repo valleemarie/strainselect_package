@@ -1,5 +1,18 @@
 # strainselect (development version)
 
+* New `select_strains()`: the clustering method in one step. It finds the
+  optimal number of clusters (largest average silhouette width) and selects
+  the strains taking into account the maximum number of strains that can be
+  sequenced (`n_max`): optimal strains completed with supplementary strains
+  when `n_max` is larger than the optimum (`fill = TRUE`), or the best
+  coverage with `n_max` strains and the list of the optimal groups that are
+  not represented when it is smaller. `print()` and `plot()` methods.
+* New `export_selection()`: the original metadata table with the selection
+  (`cluster`, `optimal_group`, `selected`, `status`, `representative`,
+  `group_represented`), optionally written to a CSV file.
+* New `report_selection()`: HTML report of the selection (summary,
+  silhouette curve, selected strains, optimal groups not represented,
+  clusters), written with the CSV file of the selection.
 * `prepare_input()` accepts column **names** as well as positions for
   `col_select`, `id` and `date`, with a clear error for unknown columns.
 * `prepare_input()` reads dates with the new `date_format` argument

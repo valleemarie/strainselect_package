@@ -7,7 +7,13 @@ reference:
   contents:
   - salmonella_strains
   - prepare_input
-- title: Clustering method
+- title: Strain selection in one step
+  desc: Optimal number of strains, maximum number of strains, export and report.
+  contents:
+  - select_strains
+  - export_selection
+  - report_selection
+- title: Clustering method, step by step
   desc: When the number of strains that can be sequenced is limited.
   contents:
   - assess_gower

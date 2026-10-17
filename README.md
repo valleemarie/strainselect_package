@@ -75,7 +75,33 @@ head(prepared_data, 3)
 #> 2020LSAL00163 Alimentation humaine Transformation industrielle  2020
 ```
 
-### Clustering method: a fixed number of strains
+### Quick start: how many strains, and which ones?
+
+`select_strains()` finds the optimal number of strains and takes into
+account the maximum number of strains you can sequence (`n_max`):
+
+``` r
+res <- select_strains(prepared_data, n_max = 20, seed = 1)
+res
+#> Strain selection (clustering method)
+#>   strains: 100 - distinct profiles: 61 
+#>   optimal number of clusters (k_opt): 61 
+#>   maximum number of strains (n_max): 20 
+#>   selected strains: 20 (selected: 20) 
+#>   optimal groups not represented: 41 out of 61
+```
+
+Export the original metadata with the selection, and write an HTML
+report:
+
+``` r
+export_selection(res, data = salmonella_strains, id = "IDENTIFIANT",
+                 file = "selection.csv")
+report_selection(res, file = "selection_report.html",
+                 data = salmonella_strains, id = "IDENTIFIANT")
+```
+
+### Clustering method, step by step
 
 The average silhouette width helps choosing the number of clusters: look
 for a maximum or a plateau.
