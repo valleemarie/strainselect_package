@@ -32,8 +32,8 @@
 #'
 #' @examples
 #' raw_data <- salmonella_strains
-#' prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-#'                                id = 1, date = 17)
+#' prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+#'                                id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 #' gower <- assess_gower(prepared_data, graph = TRUE)
 assess_gower <- function(clean_data, weights = rep.int(1, p), graph = TRUE){
   p=length(clean_data)

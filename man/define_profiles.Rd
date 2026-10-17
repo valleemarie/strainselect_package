@@ -27,8 +27,8 @@ and gives the same group number to strains with identical profiles.
 }
 \examples{
 raw_data <- salmonella_strains
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+                               id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 upset_data <- prepare_upset(prepared_data)
 upset_profiles <- define_profiles(upset_data)
 # number of distinct profiles
@@ -37,6 +37,7 @@ max(upset_profiles$group)
 \seealso{
 Other profile method: 
 \code{\link{prepare_upset}()},
-\code{\link{select_profiles}()}
+\code{\link{select_profiles}()},
+\code{\link{select_strains}()}
 }
 \concept{profile method}

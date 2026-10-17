@@ -5,12 +5,9 @@
 \alias{salmonella_strains}
 \title{Example metadata of 100 \emph{Salmonella} strains}
 \format{
-A data frame with 100 rows (one per strain) and 24 columns:
+A data frame with 100 rows (one per strain) and 22 columns:
 \describe{
 \item{IDENTIFIANT}{strain identifier (unique);}
-\item{REF_PARTENAIRE}{reference of the strain at the partner
-laboratory;}
-\item{LABORATORY_CODE}{code of the partner laboratory;}
 \item{SEROTYPE}{serotype of the strain;}
 \item{COMMENTAIRE}{free-text description of the sample;}
 \item{SAMPLETYPE}{type of sample;}

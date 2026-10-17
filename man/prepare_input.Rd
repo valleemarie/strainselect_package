@@ -62,8 +62,8 @@ prepared_data <- prepare_input(
 )
 head(prepared_data)
 # the same with column positions
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17)
+prepared_data <- prepare_input(raw_data, col_select = c(5, 8, 11, 12, 15, 22),
+                               id = 1, date = 15)
 }
 \seealso{
 Other data preparation: 

@@ -1,0 +1,229 @@
+---
+title: "`r params$title`"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    toc: true
+    toc_float: false
+    self_contained: true
+params:
+  selection: NULL
+  table: NULL
+  id_column: "id"
+  title: "Selection of strains to sequence"
+---
+
+```{r strainselect-report-setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.width = 8, fig.height = 4)
+x <- params$selection
+tab <- params$table
+profile <- identical(x$method, "profile")
+added <- c("cluster", "optimal_group", "selected", "status",
+           "representative", "group_represented")
+metadata <- setdiff(names(x$table), added)
+n_status <- table(factor(x$table$status,
+                         levels = c("optimal", "supplementary", "selected",
+                                    "not selected")))
+n_status <- n_status[n_status > 0 & names(n_status) != "not selected"]
+```
+
+## Summary
+
+- **Method**: `r if (profile) "profile method (groups of identical strains)" else "clustering method (Gower distance, hierarchical clustering, silhouette)"`
+- **Strains**: `r x$n_strains` (`r x$n_profiles` distinct profiles)
+- **Metadata used**: `r paste(metadata, collapse = ", ")``r if (!profile) paste0(" (weights: ", paste(x$weights, collapse = ", "), ")") else ""`
+- **`r if (profile) "Groups of identical strains" else "Optimal number of clusters (largest average silhouette width)"`**:
+  **`r x$k_opt`**
+- **Maximum number of strains** (`n_max`):
+  `r if (is.null(x$n_max)) "not given" else x$n_max`
+- **Selected strains**: **`r length(x$selected)`**
+  (`r paste(names(n_status), n_status, sep = ": ", collapse = ", ")`)
+
+```{r strainselect-report-interpretation, results = "asis"}
+unit <- if (profile) "groups of identical strains" else "optimal clusters"
+if (is.null(x$n_max) || x$n_max == x$k_opt) {
+  cat(sprintf("One strain was selected in each of the **%d %s**.\n",
+              x$k_opt, unit))
+} else if (x$n_max > x$k_opt && x$fill) {
+  cat(sprintf(paste(
+    "The maximum number of strains (%d) is larger than the number of %s",
+    "(%d). The **%d optimal strains** (one per group) were completed with",
+    "**%d supplementary strains**"),
+    x$n_max, unit, x$k_opt, x$k_opt, x$n_max - x$k_opt))
+  if (profile) {
+    cat(", added turn by turn: a second strain in each group that has one,",
+        "from the largest group to the smallest, then a third strain, and",
+        "so on.")
+  } else {
+    cat(", taken in the clusters of a finer cut of the tree that did not",
+        "contain an optimal strain yet.")
+  }
+  cat(" Supplementary strains often have the same metadata as already",
+      "selected strains: they add replicates rather than diversity.\n")
+} else if (x$n_max > x$k_opt) {
+  cat(sprintf(paste(
+    "The maximum number of strains (%d) is larger than the number of %s",
+    "(%d). The selection stops at the optimum (`fill = FALSE`):",
+    "**%d strains of the budget are not used**.\n"),
+    x$n_max, unit, x$k_opt, x$n_max - x$k_opt))
+} else if (profile) {
+  cat(sprintf(paste(
+    "The maximum number of strains (%d) is smaller than the number of groups",
+    "of identical strains (%d). One strain was selected in each of the %d",
+    "largest groups (groups of the same size in random order): the most",
+    "frequent profiles are favoured. **%d groups out of %d are not",
+    "represented** (see below); they are the smallest groups, often strains",
+    "with a unique profile.\n"),
+    x$n_max, x$k_opt, x$n_max, length(x$unrepresented_groups), x$k_opt))
+} else {
+  cat(sprintf(paste(
+    "The maximum number of strains (%d) is smaller than the optimal number of",
+    "clusters (%d). The tree was cut into %d clusters and the best clustered",
+    "strain of each cluster was selected. **%d optimal groups out of %d are",
+    "not represented** by any selected strain (see below).\n"),
+    x$n_max, x$k_opt, x$n_max, length(x$unrepresented_groups), x$k_opt))
+}
+```
+
+```{r strainselect-report-plot-title, results = "asis"}
+if (profile) {
+  cat("## Groups of identical strains\n\n")
+  cat("Size of each group of identical strains (grey), sorted by decreasing",
+      "size, and number of selected strains (blue).\n")
+} else {
+  cat("## Choice of the number of strains\n\n")
+  cat("Average silhouette width for each number of clusters. The dashed line",
+      "marks the optimum, the dotted line the maximum number of strains.\n")
+}
+```
+
+```{r strainselect-report-plot}
+plot(x)
+```
+
+## Selected strains
+
+Metadata used for the selection; the complete metadata of all strains are in
+the CSV file written with this report.
+
+```{r strainselect-report-selected}
+selected <- x$table[x$table$selected, c(metadata, "cluster", "status")]
+names(selected)[names(selected) == "cluster"] <- if (profile) "group" else "cluster"
+selected <- data.frame(strain = rownames(selected), selected, check.names = FALSE)
+selected <- selected[order(selected[[if (profile) "group" else "cluster"]]), ]
+knitr::kable(selected, row.names = FALSE)
+```
+
+```{r strainselect-report-unrepresented-title, results = "asis"}
+if (length(x$unrepresented_groups) > 0) {
+  if (profile) {
+    cat("## Groups not represented\n\n")
+    cat("These groups of identical strains do not contain any selected strain.\n")
+  } else {
+    cat("## Optimal groups not represented\n\n")
+    cat("These optimal groups do not contain any selected strain. Their strains",
+        "are listed below with the selected strain of their cluster",
+        "(`representative`), which is the closest selected strain in the tree.\n")
+  }
+}
+```
+
+```{r strainselect-report-unrepresented}
+if (length(x$unrepresented_groups) > 0) {
+  columns <- if (profile) c("optimal_group", metadata) else
+    c("optimal_group", metadata, "representative")
+  missed <- x$table[x$table$optimal_group %in% x$unrepresented_groups, columns]
+  if (profile) names(missed)[1] <- "group"
+  missed <- data.frame(strain = rownames(missed), missed, check.names = FALSE)
+  missed <- missed[order(missed[[2]]), ]
+  knitr::kable(missed, row.names = FALSE)
+}
+```
+
+```{r strainselect-report-clusters-title, results = "asis"}
+cat(if (profile) "## Groups\n" else "## Clusters\n")
+```
+
+```{r strainselect-report-clusters}
+if (profile) {
+  knitr::kable(x$groups, row.names = FALSE)
+} else {
+  sizes <- as.data.frame(table(cluster = x$table$cluster), responseName = "size")
+  sizes$representative <- x$table$representative[match(sizes$cluster, x$table$cluster)]
+  sizes$status <- x$table[sizes$representative, "status"]
+  knitr::kable(sizes, row.names = FALSE)
+}
+```
+
+## Columns of the CSV file
+
+The CSV file written with this report contains one row per strain and the
+following columns.
+
+```{r strainselect-report-csv-columns, results = "asis"}
+used <- intersect(metadata, names(tab))
+derived <- setdiff(metadata, names(tab))
+other <- setdiff(names(tab), c(params$id_column, metadata, added))
+cat("- **Strain identifier**:", paste0("`", params$id_column, "`"), "\n")
+cat("- **Used for the selection**:",
+    paste0("`", c(used, derived), "`", collapse = ", "))
+if (length(derived) > 0 && length(other) > 0) {
+  cat(" (", paste0("`", derived, "`", collapse = ", "),
+      " computed from the date column, not in the CSV file)", sep = "")
+}
+cat("\n")
+if (length(other) > 0) {
+  cat("- **Copied from the original table, not used for the selection**:",
+      paste0("`", other, "`", collapse = ", "), "\n")
+}
+if (profile) {
+  cat("- **Added by the selection**:\n",
+      "    - `cluster` and `optimal_group`: group of identical strains",
+      " (1 = largest group);\n", sep = "")
+} else {
+  cat("- **Added by the selection**:\n",
+      "    - `cluster`: cluster of the strain in the final cut of the tree;\n",
+      "    - `optimal_group`: cluster of the strain at the optimal number of clusters;\n",
+      sep = "")
+}
+cat("    - `selected`: `TRUE` if the strain is selected;\n",
+    "    - `status`: `optimal`, `supplementary`, `selected` or `not selected`;\n",
+    "    - `representative`: selected strain of the same ",
+    if (profile) "group" else "cluster", ";\n",
+    "    - `group_represented`: `TRUE` if the ",
+    if (profile) "group" else "optimal group",
+    " of the strain contains a selected strain.\n", sep = "")
+```
+
+## Method
+
+```{r strainselect-report-method, results = "asis"}
+if (profile) {
+  cat("The strains with identical values for all the metadata used were",
+      "grouped, and the groups were sorted by decreasing size (groups of",
+      "the same size in random order). One strain per group gives the",
+      "optimal selection. When the maximum number of strains is smaller than",
+      "the number of groups, one strain is selected in each of the largest",
+      "groups; when it is larger, supplementary strains are added turn by",
+      "turn, from the largest group to the smallest. Within a group, the",
+      "strains have the same metadata and are chosen at random.\n")
+} else {
+  cat("The Gower dissimilarity between strains was computed on the metadata,",
+      "and an agglomerative hierarchical clustering with complete linkage was",
+      "performed. The average silhouette width was computed for every number",
+      "of clusters from 2 to", max(x$silhouette$k), "; the optimal number of",
+      "clusters is the one with the largest average silhouette width. In",
+      "each cluster, the selected strain is the one with the largest",
+      "silhouette width (best clustered strain).\n")
+}
+```
+
+The complete table of strains with the selection is in the CSV file written
+with this report (`export_selection()`).
+
+---
+
+*Report generated on `r format(Sys.time(), "%Y-%m-%d %H:%M")` with
+strainselect `r utils::packageVersion("strainselect")`
+(R `r getRversion()`).*

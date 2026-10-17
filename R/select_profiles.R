@@ -23,8 +23,8 @@
 #'
 #' @examples
 #' raw_data <- salmonella_strains
-#' prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-#'                                id = 1, date = 17)
+#' prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+#'                                id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 #' upset_profiles <- define_profiles(prepare_upset(prepared_data))
 #' selection <- select_profiles(upset_profiles, prepared_data, seed = 1)
 #' # one strain per distinct profile
