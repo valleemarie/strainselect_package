@@ -17,8 +17,8 @@ Description: Helps choosing which bacterial strains to sequence from a
     the strains that share exactly the same metadata and selects one strain
     per group, so that every distinct profile is represented.
 License: MIT + file LICENSE
-URL: https://github.com/valleemarie/strainselect_package
-BugReports: https://github.com/valleemarie/strainselect_package/issues
+URL: https://github.com/lguillier/strainselect_package
+BugReports: https://github.com/lguillier/strainselect_package/issues
 Imports:
     cluster,
     factoextra,

@@ -1,7 +1,7 @@
 # strainselect
 
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/valleemarie/strainselect_package/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/valleemarie/strainselect_package/actions/workflows/R-CMD-check.yaml)
+[![R-CMD-check](https://github.com/lguillier/strainselect_package/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/lguillier/strainselect_package/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 {strainselect} helps choosing which bacterial strains to sequence from a
@@ -29,7 +29,7 @@ Install the development version from GitHub:
 
 ``` r
 # install.packages("remotes")
-remotes::install_github("valleemarie/strainselect_package", build_vignettes = TRUE)
+remotes::install_github("lguillier/strainselect_package", build_vignettes = TRUE)
 ```
 
 ## Usage
