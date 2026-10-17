@@ -3,6 +3,14 @@
 \name{cstats_table}
 \alias{cstats_table}
 \title{Clustering statistics for an increasing number of clusters}
+\source{
+Adapted from the \code{cstats.table()} function and the silhouette plot
+of Anastasia Reusova's tutorial:
+Reusova A. (2018). \emph{Hierarchical Clustering on Categorical Data in R}.
+Towards Data Science.
+\url{https://medium.com/@anastasia.reusova/hierarchical-clustering-on-categorical-data-in-r-a27e578f2995}.
+Code: \url{https://github.com/khunreus/cluster-categorical}.
+}
 \usage{
 cstats_table(dist, tree, k, step, graph_silhouette = TRUE, l)
 }

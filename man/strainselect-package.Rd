@@ -31,17 +31,17 @@ example.
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/valleemarie/strainselect_package}
-  \item Report bugs at \url{https://github.com/valleemarie/strainselect_package/issues}
+  \item \url{https://github.com/lguillier/strainselect_package}
+  \item Report bugs at \url{https://github.com/lguillier/strainselect_package/issues}
 }
 
 }
 \author{
-\strong{Maintainer}: Marie Vall<U+00E9>e \email{marie.vallee@anses.fr} (\href{https://orcid.org/0000-0002-4233-8400}{ORCID})
+\strong{Maintainer}: Laurent Guillier \email{guillier.laurent@gmail.com} (\href{https://orcid.org/0000-0002-7867-2937}{ORCID})
 
 Authors:
 \itemize{
-  \item Laurent Guillier \email{laurent.guillier@anses.fr} (\href{https://orcid.org/0000-0002-7867-2937}{ORCID})
+  \item Marie Vallée \email{marie.vallee@anses.fr} (\href{https://orcid.org/0000-0002-4233-8400}{ORCID})
 }
 
 }

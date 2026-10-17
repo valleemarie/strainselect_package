@@ -22,6 +22,12 @@
 #'   `within.cluster.ss`, `average.within`, `average.between`, `wb.ratio`,
 #'   `dunn2`, `avg.silwidth` (see [fpc::cluster.stats()]), followed by
 #'   cluster size columns. Values are rounded to 2 decimals.
+#' @source Adapted from the `cstats.table()` function and the silhouette plot
+#'   of Anastasia Reusova's tutorial:
+#'   Reusova A. (2018). *Hierarchical Clustering on Categorical Data in R*.
+#'   Towards Data Science.
+#'   <https://medium.com/@anastasia.reusova/hierarchical-clustering-on-categorical-data-in-r-a27e578f2995>.
+#'   Code: <https://github.com/khunreus/cluster-categorical>.
 #' @export
 #' @family clustering method
 #' @importFrom fpc cluster.stats

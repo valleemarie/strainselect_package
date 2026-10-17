@@ -19,6 +19,12 @@
 #'       `dissimilarity` / `dist` (see [cluster::daisy()]);}
 #'     \item{aggl.clust.c}{the clustering tree, an object of class `hclust`.}
 #'   }
+#' @source Adapted from the dissimilarity matrix and agglomerative clustering
+#'   steps of Anastasia Reusova's tutorial:
+#'   Reusova A. (2018). *Hierarchical Clustering on Categorical Data in R*.
+#'   Towards Data Science.
+#'   <https://medium.com/@anastasia.reusova/hierarchical-clustering-on-categorical-data-in-r-a27e578f2995>.
+#'   Code: <https://github.com/khunreus/cluster-categorical>.
 #' @export
 #' @family clustering method
 #' @importFrom cluster daisy

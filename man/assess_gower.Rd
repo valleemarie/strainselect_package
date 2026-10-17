@@ -3,6 +3,14 @@
 \name{assess_gower}
 \alias{assess_gower}
 \title{Compute Gower distances and the hierarchical clustering tree}
+\source{
+Adapted from the dissimilarity matrix and agglomerative clustering
+steps of Anastasia Reusova's tutorial:
+Reusova A. (2018). \emph{Hierarchical Clustering on Categorical Data in R}.
+Towards Data Science.
+\url{https://medium.com/@anastasia.reusova/hierarchical-clustering-on-categorical-data-in-r-a27e578f2995}.
+Code: \url{https://github.com/khunreus/cluster-categorical}.
+}
 \usage{
 assess_gower(clean_data, weights = rep.int(1, p), graph = TRUE)
 }
