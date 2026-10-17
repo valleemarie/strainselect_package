@@ -9,6 +9,7 @@ output:
 params:
   selection: NULL
   table: NULL
+  id_column: "id"
   title: "Selection of strains to sequence"
 ---
 
@@ -117,6 +118,37 @@ sizes <- as.data.frame(table(cluster = x$table$cluster), responseName = "size")
 sizes$representative <- x$table$representative[match(sizes$cluster, x$table$cluster)]
 sizes$status <- x$table[sizes$representative, "status"]
 knitr::kable(sizes, row.names = FALSE)
+```
+
+## Columns of the CSV file
+
+The CSV file written with this report contains one row per strain and the
+following columns.
+
+```{r strainselect-report-csv-columns, results = "asis"}
+used <- intersect(metadata, names(tab))
+derived <- setdiff(metadata, names(tab))
+other <- setdiff(names(tab), c(params$id_column, metadata, added))
+cat("- **Strain identifier**:", paste0("`", params$id_column, "`"), "\n")
+cat("- **Used for the selection**:",
+    paste0("`", c(used, derived), "`", collapse = ", "))
+if (length(derived) > 0 && length(other) > 0) {
+  cat(" (", paste0("`", derived, "`", collapse = ", "),
+      " computed from the date column, not in the CSV file)", sep = "")
+}
+cat("\n")
+if (length(other) > 0) {
+  cat("- **Copied from the original table, not used for the selection**:",
+      paste0("`", other, "`", collapse = ", "), "\n")
+}
+cat("- **Added by the selection**:\n",
+    "    - `cluster`: cluster of the strain in the final cut of the tree;\n",
+    "    - `optimal_group`: cluster of the strain at the optimal number of clusters;\n",
+    "    - `selected`: `TRUE` if the strain is selected;\n",
+    "    - `status`: `optimal`, `supplementary`, `selected` or `not selected`;\n",
+    "    - `representative`: selected strain of the same cluster;\n",
+    "    - `group_represented`: `TRUE` if the optimal group of the strain ",
+    "contains a selected strain.\n", sep = "")
 ```
 
 ## Method

@@ -5,8 +5,9 @@
 #' Renders an HTML report of a selection made with [select_strains()]:
 #' parameters and summary, silhouette curve with the optimal number of
 #' clusters and the maximum number of strains, list of the selected strains
-#' (with their metadata), optimal groups that are not represented and sizes of
-#' the clusters. Requires the {rmarkdown} package and pandoc.
+#' (with their metadata), optimal groups that are not represented, sizes of
+#' the clusters and description of the columns of the CSV file (which ones
+#' were used for the selection). Requires the {rmarkdown} package and pandoc.
 #'
 #' @param x An object returned by [select_strains()].
 #' @param file Path of the HTML file to write.
@@ -44,6 +45,7 @@ report_selection <- function(x, file = "strain_selection_report.html",
     stop("the rmarkdown package is needed to write the report", call. = FALSE)
   }
   table <- export_selection(x, data = data, id = id)
+  id_column <- if (is.null(data)) "id" else names(table)[column_position(data, id, "id")]
   if (csv) {
     csv_file <- sub("\\.html?$", "", file)
     csv_file <- paste0(csv_file, ".csv")
@@ -65,7 +67,8 @@ report_selection <- function(x, file = "strain_selection_report.html",
     output_file = basename(file),
     output_dir = out_dir,
     intermediates_dir = work_dir,
-    params = list(selection = x, table = table, title = title),
+    params = list(selection = x, table = table, id_column = id_column,
+                  title = title),
     envir = new.env(),
     quiet = TRUE
   )

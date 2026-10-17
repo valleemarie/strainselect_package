@@ -12,7 +12,8 @@
   `group_represented`), optionally written to a CSV file.
 * New `report_selection()`: HTML report of the selection (summary,
   silhouette curve, selected strains, optimal groups not represented,
-  clusters), written with the CSV file of the selection.
+  clusters, columns of the CSV file used or not for the selection), written
+  with the CSV file of the selection.
 * `prepare_input()` accepts column **names** as well as positions for
   `col_select`, `id` and `date`, with a clear error for unknown columns.
 * `prepare_input()` reads dates with the new `date_format` argument

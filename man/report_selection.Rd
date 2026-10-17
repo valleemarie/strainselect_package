@@ -36,8 +36,9 @@ The path of the HTML report, invisibly.
 Renders an HTML report of a selection made with \code{\link[=select_strains]{select_strains()}}:
 parameters and summary, silhouette curve with the optimal number of
 clusters and the maximum number of strains, list of the selected strains
-(with their metadata), optimal groups that are not represented and sizes of
-the clusters. Requires the {rmarkdown} package and pandoc.
+(with their metadata), optimal groups that are not represented, sizes of
+the clusters and description of the columns of the CSV file (which ones
+were used for the selection). Requires the {rmarkdown} package and pandoc.
 }
 \examples{
 prepared_data <- prepare_input(

@@ -13,8 +13,14 @@ test_that("report_selection writes an HTML report and a CSV file", {
                                     id = "IDENTIFIANT"))
   expect_true(file.exists(file))
   expect_true(file.exists(file.path(tempdir(), "report_test.csv")))
-  html <- paste(readLines(file, warn = FALSE), collapse = "\n")
+  # pandoc wraps long lines: compare with single spaces
+  html <- gsub("\\s+", " ", paste(readLines(file, warn = FALSE), collapse = " "))
   expect_match(html, "Selection of strains to sequence")
   expect_match(html, res$selected[1])
+  # the report tells which columns of the CSV file were used
+  expect_match(html, "Used for the selection")
+  expect_match(html, "not used for the selection")
+  expect_match(html, "REF_PARTENAIRE")
+  expect_match(html, "Strain identifier</strong>: <code>IDENTIFIANT")
   expect_error(report_selection(list()), "select_strains")
 })
