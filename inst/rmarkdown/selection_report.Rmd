@@ -59,8 +59,21 @@ if (is.null(x$n_max) || x$n_max == x$k_opt) {
     cat(", taken in the clusters of a finer cut of the tree that did not",
         "contain an optimal strain yet.")
   }
-  cat(" Supplementary strains often have the same metadata as already",
-      "selected strains: they add replicates rather than diversity.\n")
+  # factual statement on the actual data instead of a general rule
+  key <- do.call(paste, c(lapply(x$table[metadata], as.character), sep = "\r"))
+  names(key) <- rownames(x$table)
+  supp <- rownames(x$table)[x$table$status == "supplementary"]
+  first <- rownames(x$table)[x$table$status %in% c("optimal", "reference")]
+  n_dup <- sum(key[supp] %in% key[first])
+  cat(sprintf(" **%d of the %d supplementary strains have the same metadata as an already selected strain**",
+              n_dup, length(supp)))
+  if (n_dup == length(supp)) {
+    cat(": they add replicates rather than diversity.\n")
+  } else if (n_dup == 0) {
+    cat(": they all add new profiles.\n")
+  } else {
+    cat("; the others add new profiles.\n")
+  }
 } else if (x$n_max > x$k_opt) {
   cat(sprintf(paste(
     "The maximum number of strains (%d) is larger than the number of %s",
@@ -83,6 +96,27 @@ if (is.null(x$n_max) || x$n_max == x$k_opt) {
     "strain of each cluster was selected. **%d optimal groups out of %d are",
     "not represented** by any selected strain (see below).\n"),
     x$n_max, x$k_opt, x$n_max, length(x$unrepresented_groups), x$k_opt))
+}
+```
+
+```{r strainselect-report-heterogeneity, results = "asis"}
+if (!profile) {
+  # how much the strains differ from the selected strain of their cluster
+  with_rep <- which(!is.na(x$table$representative))
+  n_diff <- vapply(with_rep, function(i) {
+    sum(as.character(unlist(x$table[i, metadata])) !=
+          as.character(unlist(x$table[x$table$representative[i], metadata])))
+  }, numeric(1))
+  n_same <- sum(n_diff == 0)
+  cat(sprintf("%d of the %d strains have the same metadata as the selected strain of their cluster",
+              n_same, length(n_diff)))
+  if (n_same < length(n_diff)) {
+    cat(sprintf("; the %d others differ from it by %.1f metadata on average (at most %d out of %d).\n",
+                length(n_diff) - n_same, mean(n_diff[n_diff > 0]), max(n_diff),
+                length(metadata)))
+  } else {
+    cat(".\n")
+  }
 }
 ```
 
