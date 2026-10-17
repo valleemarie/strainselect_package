@@ -7,32 +7,44 @@
 #' date column, replaces missing values by `"unknown"` and converts every
 #' column to a factor.
 #'
-#' @param data A data frame with one row per strain.
-#' @param col_select Integer vector giving the positions of the metadata
-#'   columns to keep. The identifier and date columns are always removed from
-#'   this selection. Defaults to all columns.
-#' @param id Position of the column containing the strain identifiers.
-#' @param date Position of the date column (format `dd/mm/yyyy`), or `0`
-#'   (default) if no date should be used.
+#' @param data A data frame (or a matrix) with one row per strain.
+#' @param col_select Names or positions of the metadata columns to keep. The
+#'   identifier and date columns are always removed from this selection.
+#'   Defaults to all columns.
+#' @param id Name or position of the column containing the strain
+#'   identifiers.
+#' @param date Name or position of the date column, or `NULL` (default) if no
+#'   date should be used. `0` is also accepted for "no date".
 #' @param month If `TRUE`, a `MOIS` column with the month (`"01"` to `"12"`)
 #'   is created from the date column.
 #' @param year If `TRUE` (default), an `ANNEE` column with the year is created
 #'   from the date column.
+#' @param date_format Format of the dates, see [strptime()]. Defaults to
+#'   `"%d/%m/%Y"` (e.g. `09/01/2020`). Ignored when the date column is
+#'   already of class `Date` or `POSIXt`.
 #' @param m,a Deprecated, use `month` and `year` instead.
 #'
 #' @return A data frame with one row per strain (row names are the strain
 #'   identifiers) and one factor column per selected metadata, followed by
-#'   `ANNEE` and/or `MOIS` when a date column is used.
+#'   `ANNEE` and/or `MOIS` when a date column is used. Dates that cannot be
+#'   read give `"unknown"`.
 #' @export
 #' @family data preparation
 #' @examples
 #' datafile <- system.file("data_test.csv", package = "strainselect")
 #' raw_data <- read.csv(datafile, sep = ";", header = TRUE)
-#' prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-#'                                id = 1, date = 17, month = FALSE, year = TRUE)
+#' prepared_data <- prepare_input(
+#'   raw_data,
+#'   col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+#'   id = "IDENTIFIANT", date = "DATE_PRELEVEMENT", month = FALSE, year = TRUE
+#' )
 #' head(prepared_data)
-prepare_input <- function (data, col_select = seq_along(data), id = 1, date = 0,
-                           month = FALSE, year = TRUE, m, a) {
+#' # the same with column positions
+#' prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+#'                                id = 1, date = 17)
+prepare_input <- function (data, col_select = seq_len(ncol(data)), id = 1, date = NULL,
+                           month = FALSE, year = TRUE, date_format = "%d/%m/%Y",
+                           m, a) {
   if (!missing(m)) {
     warning("`m` is deprecated, use `month` instead.", call. = FALSE)
     month <- m
@@ -40,6 +52,15 @@ prepare_input <- function (data, col_select = seq_along(data), id = 1, date = 0,
   if (!missing(a)) {
     warning("`a` is deprecated, use `year` instead.", call. = FALSE)
     year <- a
+  }
+  data <- as.data.frame(data)
+  id <- column_position(data, id, "id")
+  col_select <- column_position(data, col_select, "col_select")
+  if (isTRUE(all.equal(date, 0))) {
+    date <- NULL
+  }
+  if (!is.null(date)) {
+    date <- column_position(data, date, "date")
   }
   duplicate <- which(duplicated(data[,id]))
   if (length(duplicate)!=0) {
@@ -50,16 +71,50 @@ prepare_input <- function (data, col_select = seq_along(data), id = 1, date = 0,
   rownames(data) <- data[,id]
   col_select <- col_select[! col_select %in% c(id, date)]
   clean_data <- data[, col_select, drop = FALSE]
-  if (date!=0){
+  if (!is.null(date)){
+    dates <- data[[date]]
+    if (inherits(dates, c("Date", "POSIXt"))) {
+      dates <- as.Date(dates)
+    } else {
+      dates <- as.Date(as.character(dates), format = date_format)
+      if (all(is.na(dates)) && any(!is.na(data[[date]]))) {
+        warning("no date could be read with date_format = \"", date_format,
+                "\"; check the `date_format` argument.", call. = FALSE)
+      }
+    }
     if(year){
-      clean_data$ANNEE <- substr(data[,date],7,10)
+      clean_data$ANNEE <- format(dates, "%Y")
     }
     if(month){
-      clean_data$MOIS <- substr(data[,date],4,5)
+      clean_data$MOIS <- format(dates, "%m")
     }
   }
   clean_data[is.na(clean_data)] <- "unknown"
   clean_data[] <- lapply(clean_data, factor)
   message("selected metadata: ", paste(colnames(clean_data), collapse = ", "))
   clean_data
+}
+
+#' Convert column names or positions into positions
+#'
+#' @param data A data frame.
+#' @param x Column names (character) or positions (numeric).
+#' @param arg Name of the argument, used in error messages.
+#'
+#' @return An integer vector of column positions.
+#' @noRd
+column_position <- function(data, x, arg) {
+  if (is.character(x)) {
+    pos <- match(x, names(data))
+    if (anyNA(pos)) {
+      stop("unknown column(s) in `", arg, "`: ",
+           paste(x[is.na(pos)], collapse = ", "), call. = FALSE)
+    }
+    return(pos)
+  }
+  if (!is.numeric(x) || any(x < 1 | x > ncol(data))) {
+    stop("`", arg, "` must be column names or positions between 1 and ",
+         ncol(data), call. = FALSE)
+  }
+  as.integer(x)
 }

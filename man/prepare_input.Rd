@@ -6,26 +6,28 @@
 \usage{
 prepare_input(
   data,
-  col_select = seq_along(data),
+  col_select = seq_len(ncol(data)),
   id = 1,
-  date = 0,
+  date = NULL,
   month = FALSE,
   year = TRUE,
+  date_format = "\%d/\%m/\%Y",
   m,
   a
 )
 }
 \arguments{
-\item{data}{A data frame with one row per strain.}
+\item{data}{A data frame (or a matrix) with one row per strain.}
 
-\item{col_select}{Integer vector giving the positions of the metadata
-columns to keep. The identifier and date columns are always removed from
-this selection. Defaults to all columns.}
+\item{col_select}{Names or positions of the metadata columns to keep. The
+identifier and date columns are always removed from this selection.
+Defaults to all columns.}
 
-\item{id}{Position of the column containing the strain identifiers.}
+\item{id}{Name or position of the column containing the strain
+identifiers.}
 
-\item{date}{Position of the date column (format \code{dd/mm/yyyy}), or \code{0}
-(default) if no date should be used.}
+\item{date}{Name or position of the date column, or \code{NULL} (default) if no
+date should be used. \code{0} is also accepted for "no date".}
 
 \item{month}{If \code{TRUE}, a \code{MOIS} column with the month (\code{"01"} to \code{"12"})
 is created from the date column.}
@@ -33,12 +35,17 @@ is created from the date column.}
 \item{year}{If \code{TRUE} (default), an \code{ANNEE} column with the year is created
 from the date column.}
 
+\item{date_format}{Format of the dates, see \code{\link[=strptime]{strptime()}}. Defaults to
+\code{"\%d/\%m/\%Y"} (e.g. \code{09/01/2020}). Ignored when the date column is
+already of class \code{Date} or \code{POSIXt}.}
+
 \item{m, a}{Deprecated, use \code{month} and \code{year} instead.}
 }
 \value{
 A data frame with one row per strain (row names are the strain
 identifiers) and one factor column per selected metadata, followed by
-\code{ANNEE} and/or \code{MOIS} when a date column is used.
+\code{ANNEE} and/or \code{MOIS} when a date column is used. Dates that cannot be
+read give \code{"unknown"}.
 }
 \description{
 Checks that strain identifiers are unique, keeps the metadata columns used
@@ -49,8 +56,14 @@ column to a factor.
 \examples{
 datafile <- system.file("data_test.csv", package = "strainselect")
 raw_data <- read.csv(datafile, sep = ";", header = TRUE)
-prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
-                               id = 1, date = 17, month = FALSE, year = TRUE)
+prepared_data <- prepare_input(
+  raw_data,
+  col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
+  id = "IDENTIFIANT", date = "DATE_PRELEVEMENT", month = FALSE, year = TRUE
+)
 head(prepared_data)
+# the same with column positions
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17)
 }
 \concept{data preparation}

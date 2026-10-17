@@ -27,6 +27,50 @@ test_that("prepare_input selects columns, extracts dates and replaces NA", {
   expect_equal(colnames(res_year), c("HOST", "COUNTRY", "ANNEE"))
 })
 
+test_that("prepare_input accepts column names", {
+  raw <- data.frame(
+    ID = c("s1", "s2", "s3"),
+    HOST = c("pig", NA, "cattle"),
+    DATE = c("09/01/2020", "15/03/2021", "30/12/2021"),
+    COUNTRY = c("FR", "FR", "IT")
+  )
+  by_position <- suppressMessages(
+    prepare_input(raw, col_select = c(2, 4), id = 1, date = 3, month = TRUE)
+  )
+  by_name <- suppressMessages(
+    prepare_input(raw, col_select = c("HOST", "COUNTRY"), id = "ID", date = "DATE",
+                  month = TRUE)
+  )
+  expect_identical(by_name, by_position)
+  expect_error(prepare_input(raw, col_select = c("HOST", "SPECIES"), id = "ID"),
+               "unknown column\\(s\\) in `col_select`: SPECIES")
+  expect_error(prepare_input(raw, id = "STRAIN"), "unknown column\\(s\\) in `id`")
+  expect_error(prepare_input(raw, col_select = 2:9), "between 1 and 4")
+})
+
+test_that("prepare_input reads dates in other formats and handles bad dates", {
+  raw <- data.frame(
+    ID = c("s1", "s2", "s3"),
+    DATE = c("2020-01-09", NA, "2021-12-30")
+  )
+  res <- suppressMessages(
+    prepare_input(raw, id = "ID", date = "DATE", month = TRUE, date_format = "%Y-%m-%d")
+  )
+  expect_equal(as.character(res$ANNEE), c("2020", "unknown", "2021"))
+  expect_equal(as.character(res$MOIS), c("01", "unknown", "12"))
+  # Date class is used as is
+  raw$DATE <- as.Date(raw$DATE)
+  res_date <- suppressMessages(prepare_input(raw, id = "ID", date = "DATE", month = TRUE))
+  expect_identical(res_date, res)
+  # a wrong format gives a warning
+  raw$DATE <- c("2020-01-09", "2021-03-15", "2021-12-30")
+  expect_warning(suppressMessages(prepare_input(raw, id = "ID", date = "DATE")),
+                 "date_format")
+  # date = 0 means no date: DATE is then kept as an ordinary metadata
+  res0 <- suppressMessages(prepare_input(raw, id = "ID", date = 0))
+  expect_equal(colnames(res0), "DATE")
+})
+
 test_that("prepare_input drops the identifier column by default", {
   raw <- data.frame(ID = c("s1", "s2"), HOST = c("pig", "cattle"))
   res <- suppressMessages(prepare_input(raw))
