@@ -99,6 +99,10 @@
 #' res_profile
 #' plot(res_profile)
 #' head(res_profile$groups)
+#' # profile method, budget smaller than the number of distinct profiles:
+#' # one strain in each of the 20 largest groups
+#' res_profile_20 <- select_strains(prepared_data, n_max = 20, method = "profile", seed = 1)
+#' plot(res_profile_20)
 select_strains <- function(prepared_data, n_max = NULL,
                            method = c("clustering", "profile"), fill = TRUE,
                            weights = NULL, k_max = NULL, seed = NULL) {

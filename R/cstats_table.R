@@ -40,8 +40,7 @@
 #'                                id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 #' gower <- assess_gower(prepared_data, graph = FALSE)
 #' stats <- cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c,
-#'                       k = 50, step = 10)
-#' stats[, c("cluster.number", "avg.silwidth")]
+#'                       k = 60, step = 2)
 cstats_table <- function(dist, tree, k, step, graph_silhouette = TRUE, l) {
    if (!missing(l)) {
      warning("`l` is deprecated, use `step` instead.", call. = FALSE)

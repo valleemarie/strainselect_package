@@ -128,9 +128,19 @@ prepared_data <- prepare_input(raw_data, col_select = c("CONTEXTE", "MATRICE1", 
                                id = "IDENTIFIANT", date = "DATE_PRELEVEMENT")
 gower <- assess_gower(prepared_data, graph = FALSE)
 stats <- cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c,
-                      k = 50, step = 10)
-stats[, c("cluster.number", "avg.silwidth")]
+                      k = 60, step = 2)
 ```
+
+With a small step (here every 2 clusters), the curve shows two plateaus. The
+average silhouette width jumps to about 0.45 at 15–16 clusters and then stays
+around 0.41–0.43 up to about 30 clusters: **about 15 clusters** is a first
+level that already captures the main structure of the collection. It jumps
+again to about 0.47 at 33–34 clusters and stays around 0.47–0.51 up to about
+52 clusters: **about 33 clusters** is a second, finer level. Beyond, the
+curve increases up to the number of distinct profiles (61), where every
+profile is isolated: with categorical metadata, this maximum is not a natural
+level of grouping. The number of strains to sequence can be chosen at one of
+the two plateaus, depending on the resources available.
 
 ## Selecting the strains: select_silhouette
 
@@ -219,6 +229,10 @@ res_profile <- select_strains(prepared_data, n_max = 75, method = "profile", see
 res_profile
 plot(res_profile)
 head(res_profile$groups)
+# profile method, budget smaller than the number of distinct profiles:
+# one strain in each of the 20 largest groups
+res_profile_20 <- select_strains(prepared_data, n_max = 20, method = "profile", seed = 1)
+plot(res_profile_20)
 ```
 
 ## Exporting the result: export_selection
