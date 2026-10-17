@@ -2,32 +2,60 @@
 % Please edit documentation in R/cstats_table.R
 \name{cstats_table}
 \alias{cstats_table}
-\title{cstats_table}
+\title{Clustering statistics for an increasing number of clusters}
+\source{
+Adapted from the \code{cstats.table()} function and the silhouette plot
+of Anastasia Reusova's tutorial:
+Reusova A. (2018). \emph{Hierarchical Clustering on Categorical Data in R}.
+Towards Data Science.
+\url{https://medium.com/@anastasia.reusova/hierarchical-clustering-on-categorical-data-in-r-a27e578f2995}.
+Code: \url{https://github.com/khunreus/cluster-categorical}.
+}
 \usage{
-cstats_table(dist, tree, k, l, graph_silhouette = T)
+cstats_table(dist, tree, k, step, graph_silhouette = TRUE, l)
 }
 \arguments{
-\item{dist}{a distance object}
+\item{dist}{A dissimilarity object, e.g. \code{gower_dist} returned by
+\code{\link[=assess_gower]{assess_gower()}}.}
 
-\item{tree}{a dendrogram object}
+\item{tree}{An \code{hclust} object, e.g. \code{aggl.clust.c} returned by
+\code{\link[=assess_gower]{assess_gower()}}.}
 
-\item{k}{a number}
+\item{k}{Largest number of clusters to test. Must be a multiple of \code{step}.}
 
-\item{l}{a number}
+\item{step}{Increment between two numbers of clusters tested.}
 
-\item{graph_silhouette}{a boolean}
+\item{graph_silhouette}{If \code{TRUE} (default), the average silhouette width
+is plotted against the number of clusters.}
+
+\item{l}{Deprecated, use \code{step} instead.}
 }
 \value{
-a dataframe
+A data frame with one row per number of clusters tested (row names
+\verb{Test <number of clusters>}) and the columns \code{cluster.number}, \code{n},
+\code{within.cluster.ss}, \code{average.within}, \code{average.between}, \code{wb.ratio},
+\code{dunn2}, \code{avg.silwidth} (see \code{\link[fpc:cluster.stats]{fpc::cluster.stats()}}), followed by
+cluster size columns. Values are rounded to 2 decimals.
 }
 \description{
-cstats_table
+Cuts the clustering tree into \code{step}, \code{2 * step}, ..., \code{k} clusters and
+computes, for each number of clusters, the statistics of
+\code{\link[fpc:cluster.stats]{fpc::cluster.stats()}}. The average silhouette width can be plotted to help
+choosing the number of clusters.
 }
 \examples{
-# Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
-gower <- assess_gower(prepared_data, graph = T)
-# Apply my function
-cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c, k = 50,l = 10)
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17)
+gower <- assess_gower(prepared_data, graph = FALSE)
+stats <- cstats_table(dist = gower$gower_dist, tree = gower$aggl.clust.c,
+                      k = 50, step = 10)
+stats[, c("cluster.number", "avg.silwidth")]
 }
+\seealso{
+Other clustering method: 
+\code{\link{assess_gower}()},
+\code{\link{select_silhouette}()}
+}
+\concept{clustering method}

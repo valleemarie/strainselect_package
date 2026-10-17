@@ -2,29 +2,45 @@
 % Please edit documentation in R/select_profiles.R
 \name{select_profiles}
 \alias{select_profiles}
-\title{select_profiles}
+\title{Select one strain per group of identical profiles}
 \usage{
-select_profiles(profiles, prepared_data)
+select_profiles(profiles, prepared_data, seed = NULL)
 }
 \arguments{
-\item{profiles}{a data frame}
+\item{profiles}{A data frame returned by \code{\link[=define_profiles]{define_profiles()}}.}
 
-\item{prepared_data}{a data frame}
+\item{prepared_data}{A data frame with one row per strain, as returned by
+\code{\link[=prepare_input]{prepare_input()}}, with rows in the same order as \code{profiles}.}
+
+\item{seed}{An integer passed to \code{\link[=set.seed]{set.seed()}} to make the random choice of
+the representative strains reproducible, or \code{NULL} (default) to leave the
+random number generator untouched.}
 }
 \value{
-a data frame
+\code{prepared_data} with three additional columns:
+\describe{
+\item{group}{the group of identical profiles of the strain;}
+\item{size}{the number of strains in this group;}
+\item{selected}{the identifier of the strain selected for this group.}
+}
+The selected strains are given by \code{unique(result$selected)}.
 }
 \description{
-select_profiles
+Selects at random one strain in each group defined by \code{\link[=define_profiles]{define_profiles()}}.
 }
 \examples{
-# Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-upset_data <- prepare_upset(prepared_data)
-upset_profiles <- define_profiles(upset_data)
-# Apply my function
-select_profiles(upset_profiles,prepared_data)
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17)
+upset_profiles <- define_profiles(prepare_upset(prepared_data))
+selection <- select_profiles(upset_profiles, prepared_data, seed = 1)
+# one strain per distinct profile
+length(unique(selection$selected))
 }
+\seealso{
+Other profile method: 
+\code{\link{define_profiles}()},
+\code{\link{prepare_upset}()}
+}
+\concept{profile method}

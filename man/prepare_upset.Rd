@@ -2,25 +2,36 @@
 % Please edit documentation in R/prepare_upset.R
 \name{prepare_upset}
 \alias{prepare_upset}
-\title{prepare_upset}
+\title{Build the binary table of metadata modalities}
 \usage{
 prepare_upset(prepared_data)
 }
 \arguments{
-\item{prepared_data}{a dataframe}
+\item{prepared_data}{A data frame with one row per strain, as returned by
+\code{\link[=prepare_input]{prepare_input()}}.}
 }
 \value{
-a dataframe
+A data frame with the same row names as \code{prepared_data} and one
+numeric (0/1) column per modality, named \code{"<metadata> _ <modality>"}.
+Modalities appear in their order of first appearance.
 }
 \description{
-prepare_upset
+Creates one column per modality of each metadata, filled with 1 when the
+strain has this modality and 0 otherwise. The result can be used to draw an
+UpSet plot (e.g. with \code{UpSetR::upset()}) and to define profiles with
+\code{\link[=define_profiles]{define_profiles()}}.
 }
 \examples{
-# Example with your dataset in "inst/"
 datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";",header = T)
-prepared_data <- prepare_input(raw_data,col_select = c(7,10,13,14,17,24),
-              id=1,date=17,m=FALSE,a=TRUE)
-# Apply my function
-prepare_upset(prepared_data)
+raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
+                               id = 1, date = 17)
+upset_data <- prepare_upset(prepared_data)
+upset_data[1:5, 1:4]
 }
+\seealso{
+Other profile method: 
+\code{\link{define_profiles}()},
+\code{\link{select_profiles}()}
+}
+\concept{profile method}
