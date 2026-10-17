@@ -2,9 +2,9 @@ Package: strainselect
 Title: Select Bacterial Strains to Sequence Based on Their Metadata
 Version: 0.1.0
 Authors@R: c(
-    person("Marie", "Vallée", , "marie.vallee@anses.fr", role = c("aut", "cre"),
+    person("Marie", "Vallée", , "marie.vallee@anses.fr", role = "aut",
            comment = c(ORCID = "0000-0002-4233-8400")),
-    person("Laurent", "Guillier", , "laurent.guillier@anses.fr", role = "aut",
+    person("Laurent", "Guillier", , "guillier.laurent@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-7867-2937"))
   )
 Description: Helps choosing which bacterial strains to sequence from a
