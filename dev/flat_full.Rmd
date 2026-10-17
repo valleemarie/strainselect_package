@@ -716,10 +716,19 @@ In each cluster, the selected strain is the one with the largest silhouette
 width, i.e. the best clustered one (ties are broken at random, use `seed` for
 reproducibility).
 
-With categorical metadata, identical strains are at distance 0, so the
-optimum is often close to the number of distinct profiles. Supplementary
-strains then mostly have the same metadata as already selected strains: they
-do not add diversity regarding the metadata, but may be useful as replicates.
+With categorical metadata and equal weights, identical strains are at
+distance 0 and the optimum is often close to the number of distinct profiles:
+supplementary strains then mostly have the same metadata as already selected
+strains, and add replicates rather than diversity. This is not a general
+rule. The weights change the Gower distances between different strains, hence
+the tree, the silhouette curve and the optimum (in the example of this
+vignette, a weight of 3 on `REGION` lowers the optimum from 61 to 22
+clusters), and supplementary strains can then add new profiles. Conversely,
+below the optimum, the strains of a cluster are similar but not identical.
+The report written by `report_selection()` gives, for the actual data, the
+number of supplementary strains that have the same metadata as an already
+selected strain, and how much the strains differ from the selected strain of
+their cluster.
 
 `select_strains(method = "profile")` applies the same logic to the profile
 method. The strains with identical metadata form groups, sorted by decreasing
@@ -1476,7 +1485,16 @@ test_that("report_selection writes an HTML report and a CSV file", {
   expect_match(html, "not used for the selection")
   expect_match(html, "SEROTYPE")
   expect_match(html, "Strain identifier</strong>: <code>IDENTIFIANT")
+  # factual statement on the heterogeneity of the clusters
+  expect_match(html, "strains have the same metadata as the selected strain of their cluster")
   expect_error(report_selection(list()), "select_strains")
+  # supplementary strains: number with the same metadata as a selected strain
+  res_supp <- select_strains(pd, seed = 1)
+  res_supp <- select_strains(pd, n_max = res_supp$k_opt + 5, seed = 1)
+  file_supp <- file.path(tempdir(), "report_supp.html")
+  suppressMessages(report_selection(res_supp, file = file_supp))
+  html_supp <- gsub("\\s+", " ", paste(readLines(file_supp, warn = FALSE), collapse = " "))
+  expect_match(html_supp, "of the 5 supplementary strains have the same metadata as an already selected strain")
 })
 
 test_that("report_selection works with the profile method", {

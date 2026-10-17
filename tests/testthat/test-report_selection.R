@@ -22,7 +22,16 @@ test_that("report_selection writes an HTML report and a CSV file", {
   expect_match(html, "not used for the selection")
   expect_match(html, "SEROTYPE")
   expect_match(html, "Strain identifier</strong>: <code>IDENTIFIANT")
+  # factual statement on the heterogeneity of the clusters
+  expect_match(html, "strains have the same metadata as the selected strain of their cluster")
   expect_error(report_selection(list()), "select_strains")
+  # supplementary strains: number with the same metadata as a selected strain
+  res_supp <- select_strains(pd, seed = 1)
+  res_supp <- select_strains(pd, n_max = res_supp$k_opt + 5, seed = 1)
+  file_supp <- file.path(tempdir(), "report_supp.html")
+  suppressMessages(report_selection(res_supp, file = file_supp))
+  html_supp <- gsub("\\s+", " ", paste(readLines(file_supp, warn = FALSE), collapse = " "))
+  expect_match(html_supp, "of the 5 supplementary strains have the same metadata as an already selected strain")
 })
 
 test_that("report_selection works with the profile method", {
