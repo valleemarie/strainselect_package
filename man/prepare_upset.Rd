@@ -22,8 +22,7 @@ UpSet plot (e.g. with \code{UpSetR::upset()}) and to define profiles with
 \code{\link[=define_profiles]{define_profiles()}}.
 }
 \examples{
-datafile <- system.file("data_test.csv", package = "strainselect")
-raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+raw_data <- salmonella_strains
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17)
 upset_data <- prepare_upset(prepared_data)

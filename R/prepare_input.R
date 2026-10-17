@@ -31,8 +31,7 @@
 #' @export
 #' @family data preparation
 #' @examples
-#' datafile <- system.file("data_test.csv", package = "strainselect")
-#' raw_data <- read.csv(datafile, sep = ";", header = TRUE)
+#' raw_data <- salmonella_strains
 #' prepared_data <- prepare_input(
 #'   raw_data,
 #'   col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),

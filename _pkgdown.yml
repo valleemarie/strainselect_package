@@ -3,8 +3,9 @@ template:
   bootstrap: 5
 
 reference:
-- title: Data preparation
+- title: Data and data preparation
   contents:
+  - salmonella_strains
   - prepare_input
 - title: Clustering method
   desc: When the number of strains that can be sequenced is limited.

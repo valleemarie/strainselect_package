@@ -5,6 +5,11 @@
 * `prepare_input()` reads dates with the new `date_format` argument
   (`"%d/%m/%Y"` by default) and accepts `Date` columns; unreadable dates give
   `"unknown"`. `date = NULL` is the new default for "no date" (`0` still works).
+* New dataset `salmonella_strains` (the example table, available as soon as
+  the package is loaded); the examples, the vignette and the README use it.
+  The CSV file `data_test.csv` is kept to show the expected input format.
+* `citation("strainselect")` gives the reference of the package; a
+  `CITATION.cff` file adds a "Cite this repository" button on GitHub.
 * The old `How_to_use_Strainselect/` folder and `.Rhistory` are removed from
   the repository: their content is now in the "Get started" vignette.
 
