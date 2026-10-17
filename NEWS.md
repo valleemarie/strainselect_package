@@ -7,6 +7,11 @@
   when `n_max` is larger than the optimum (`fill = TRUE`), or the best
   coverage with `n_max` strains and the list of the optimal groups that are
   not represented when it is smaller. `print()` and `plot()` methods.
+  With `method = "profile"`, the same logic applies to the profile method:
+  groups of identical strains sorted by decreasing size, one strain in each
+  of the `n_max` largest groups when `n_max` is smaller than the number of
+  groups, and supplementary strains added turn by turn (from the largest
+  group to the smallest) when it is larger.
 * New `export_selection()`: the original metadata table with the selection
   (`cluster`, `optimal_group`, `selected`, `status`, `representative`,
   `group_represented`), optionally written to a CSV file.

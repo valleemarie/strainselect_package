@@ -7,6 +7,7 @@
 select_strains(
   prepared_data,
   n_max = NULL,
+  method = c("clustering", "profile"),
   fill = TRUE,
   weights = NULL,
   k_max = NULL,
@@ -18,57 +19,83 @@ select_strains(
 \code{\link[=prepare_input]{prepare_input()}}.}
 
 \item{n_max}{Maximum number of strains that can be sequenced, or \code{NULL}
-(default) to select the optimal number of strains.}
+(default) to select the optimal number of strains (one per optimal
+cluster or one per distinct profile).}
+
+\item{method}{\code{"clustering"} (default) or \code{"profile"}.}
 
 \item{fill}{If \code{TRUE} (default) and \code{n_max} is larger than the optimal
-number of clusters, the selection is completed up to \code{n_max} strains
+number of strains, the selection is completed up to \code{n_max} strains
 with supplementary strains. If \code{FALSE}, the selection stops at the
 optimum.}
 
-\item{weights}{Numeric vector of weights, one per column of
-\code{prepared_data} (see \code{\link[=assess_gower]{assess_gower()}}), or \code{NULL} for equal weights.}
+\item{weights}{Clustering method only: numeric vector of weights, one per
+column of \code{prepared_data} (see \code{\link[=assess_gower]{assess_gower()}}), or \code{NULL} for equal
+weights.}
 
-\item{k_max}{Largest number of clusters tested to find the optimum. By
-default, the number of distinct profiles (beyond it, clusters only split
-identical strains), limited to the number of strains minus 1. Lower it
-to save time on large datasets.}
+\item{k_max}{Clustering method only: largest number of clusters tested to
+find the optimum. By default, the number of distinct profiles (beyond
+it, clusters only split identical strains), limited to the number of
+strains minus 1. Lower it to save time on large datasets.}
 
-\item{seed}{An integer passed to \code{\link[=set.seed]{set.seed()}} to make the choice between
-ex aequo strains reproducible, or \code{NULL} (default).}
+\item{seed}{An integer passed to \code{\link[=set.seed]{set.seed()}} to make the random choices
+reproducible (ex aequo strains or groups), or \code{NULL} (default).}
 }
 \value{
 An object of class \code{strainselect_selection}, a list with:
 \describe{
 \item{table}{\code{prepared_data} with the columns \code{cluster} (cluster in
-the final cut of the tree), \code{optimal_group} (cluster at the optimal
-number of clusters), \code{selected} (\code{TRUE}/\code{FALSE}), \code{status}
-(\code{"optimal"}, \code{"supplementary"}, \code{"selected"} or \code{"not selected"}),
-\code{representative} (identifier of the strain selected in the same
-cluster) and \code{group_represented} (whether the optimal group of the
-strain contains a selected strain);}
+the final cut of the tree, or group of identical strains numbered by
+decreasing size for the profile method), \code{optimal_group} (cluster at
+the optimal number of clusters, or group of identical strains),
+\code{selected} (\code{TRUE}/\code{FALSE}), \code{status} (\code{"optimal"},
+\code{"supplementary"}, \code{"selected"} or \code{"not selected"}),
+\code{representative} (identifier of the selected strain of the same
+cluster or group, \code{NA} if none) and \code{group_represented} (whether the
+optimal group of the strain contains a selected strain);}
 \item{selected}{identifiers of the selected strains;}
-\item{k_opt}{optimal number of clusters;}
-\item{k}{number of clusters of the final cut, i.e. number of selected
-strains;}
+\item{method}{the method used;}
+\item{k_opt}{optimal number of strains: optimal number of clusters, or
+number of distinct profiles for the profile method;}
+\item{k}{number of selected strains;}
 \item{n_max, fill}{the arguments used;}
-\item{silhouette}{data frame of the average silhouette width (\code{avg_silwidth})
-for each number of clusters \code{k} tested;}
-\item{unrepresented_groups}{optimal groups without any selected strain
-(only when \code{n_max} is smaller than the optimum);}
+\item{silhouette}{clustering method: data frame of the average
+silhouette width (\code{avg_silwidth}) for each number of clusters \code{k}
+tested;}
+\item{groups}{profile method: data frame with, for each group of
+identical strains, its \code{size}, its number of selected strains
+(\code{n_selected}) and its \code{profile};}
+\item{unrepresented_groups}{optimal groups without any selected
+strain (only when \code{n_max} is smaller than the optimum);}
 \item{n_strains, n_profiles}{number of strains and of distinct
 profiles;}
-\item{weights}{the weights of the metadata;}
-\item{gower}{the output of \code{\link[=assess_gower]{assess_gower()}}.}
+\item{weights}{the weights of the metadata (clustering method);}
+\item{gower}{the output of \code{\link[=assess_gower]{assess_gower()}} (clustering method).}
 }
 The object has \code{print()} and \code{plot()} methods, and can be exported with
 \code{\link[=export_selection]{export_selection()}} or summarised in a report with
 \code{\link[=report_selection]{report_selection()}}.
 }
 \description{
-Runs the clustering method in one step: computes the Gower distances and
-the hierarchical clustering tree, finds the optimal number of clusters
-(largest average silhouette width) and selects the strains to sequence,
-taking into account the maximum number of strains that can be sequenced.
+Selects the strains to sequence with the clustering method or with the
+profile method, taking into account the maximum number of strains that
+can be sequenced.
+}
+\details{
+\strong{Clustering method} (\code{method = "clustering"}, default): computes the
+Gower distances and the hierarchical clustering tree, finds the optimal
+number of clusters (largest average silhouette width) and selects in each
+cluster the strain with the largest silhouette width.
+
+\strong{Profile method} (\code{method = "profile"}): groups the strains with
+identical metadata (distinct profiles) and sorts the groups by decreasing
+size (ties in random order). One strain per group gives the "optimal"
+selection. With a smaller \code{n_max}, one strain is selected in each of the
+\code{n_max} largest groups. With a larger \code{n_max}, supplementary strains are
+added turn by turn: a second strain in each group that has one, from the
+largest group to the smallest, then a third strain, and so on. Strains of
+a group have the same metadata, so the strain(s) of a group are chosen at
+random.
 }
 \examples{
 prepared_data <- prepare_input(
@@ -76,7 +103,7 @@ prepared_data <- prepare_input(
   col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
   id = "IDENTIFIANT", date = "DATE_PRELEVEMENT"
 )
-# no budget: optimal number of strains
+# clustering method, no budget: optimal number of strains
 res <- select_strains(prepared_data, seed = 1)
 res
 plot(res)
@@ -84,6 +111,11 @@ plot(res)
 res_20 <- select_strains(prepared_data, n_max = 20, seed = 1)
 res_20
 head(res_20$table[, c("cluster", "optimal_group", "selected", "status")])
+# profile method, budget larger than the number of distinct profiles
+res_profile <- select_strains(prepared_data, n_max = 75, method = "profile", seed = 1)
+res_profile
+plot(res_profile)
+head(res_profile$groups)
 }
 \seealso{
 Other clustering method: 
@@ -92,5 +124,11 @@ Other clustering method:
 \code{\link{export_selection}()},
 \code{\link{report_selection}()},
 \code{\link{select_silhouette}()}
+
+Other profile method: 
+\code{\link{define_profiles}()},
+\code{\link{prepare_upset}()},
+\code{\link{select_profiles}()}
 }
 \concept{clustering method}
+\concept{profile method}

@@ -31,6 +31,7 @@ upset_data[1:5, 1:4]
 \seealso{
 Other profile method: 
 \code{\link{define_profiles}()},
-\code{\link{select_profiles}()}
+\code{\link{select_profiles}()},
+\code{\link{select_strains}()}
 }
 \concept{profile method}

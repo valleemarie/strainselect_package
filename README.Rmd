@@ -80,6 +80,13 @@ res <- select_strains(prepared_data, n_max = 20, seed = 1)
 res
 ```
 
+The same with the profile method (one strain per group of identical strains,
+largest groups first):
+
+```{r select-strains-profile}
+select_strains(prepared_data, n_max = 20, method = "profile", seed = 1)
+```
+
 Export the original metadata with the selection, and write an HTML report:
 
 ``` r

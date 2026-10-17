@@ -37,6 +37,7 @@ max(upset_profiles$group)
 \seealso{
 Other profile method: 
 \code{\link{prepare_upset}()},
-\code{\link{select_profiles}()}
+\code{\link{select_profiles}()},
+\code{\link{select_strains}()}
 }
 \concept{profile method}

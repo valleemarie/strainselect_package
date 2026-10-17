@@ -40,6 +40,7 @@ length(unique(selection$selected))
 \seealso{
 Other profile method: 
 \code{\link{define_profiles}()},
-\code{\link{prepare_upset}()}
+\code{\link{prepare_upset}()},
+\code{\link{select_strains}()}
 }
 \concept{profile method}

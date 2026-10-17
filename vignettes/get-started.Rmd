@@ -184,13 +184,29 @@ optimum is often close to the number of distinct profiles. Supplementary
 strains then mostly have the same metadata as already selected strains: they
 do not add diversity regarding the metadata, but may be useful as replicates.
 
+`select_strains(method = "profile")` applies the same logic to the profile
+method. The strains with identical metadata form groups, sorted by decreasing
+size (groups of the same size in random order); one strain per group is the
+optimal selection:
+
+- budget smaller than the number of groups: one strain in each of the `n_max`
+  largest groups — the most frequent profiles are favoured, and the smallest
+  groups (often strains with a unique profile) are listed as not represented;
+- budget larger than the number of groups: one strain per group, then
+  supplementary strains added turn by turn — a second strain in each group
+  that has one, from the largest group to the smallest, then a third strain,
+  and so on.
+
+Within a group, the strains have the same metadata and are chosen at random
+(use `seed` for reproducibility).
+
 ```{r examples-select_strains}
 prepared_data <- prepare_input(
   salmonella_strains,
   col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
   id = "IDENTIFIANT", date = "DATE_PRELEVEMENT"
 )
-# no budget: optimal number of strains
+# clustering method, no budget: optimal number of strains
 res <- select_strains(prepared_data, seed = 1)
 res
 plot(res)
@@ -198,6 +214,11 @@ plot(res)
 res_20 <- select_strains(prepared_data, n_max = 20, seed = 1)
 res_20
 head(res_20$table[, c("cluster", "optimal_group", "selected", "status")])
+# profile method, budget larger than the number of distinct profiles
+res_profile <- select_strains(prepared_data, n_max = 75, method = "profile", seed = 1)
+res_profile
+plot(res_profile)
+head(res_profile$groups)
 ```
 
 ## Exporting the result: export_selection

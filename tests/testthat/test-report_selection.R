@@ -24,3 +24,22 @@ test_that("report_selection writes an HTML report and a CSV file", {
   expect_match(html, "Strain identifier</strong>: <code>IDENTIFIANT")
   expect_error(report_selection(list()), "select_strains")
 })
+
+test_that("report_selection works with the profile method", {
+  skip_if_not_installed("rmarkdown")
+  skip_if_not(rmarkdown::pandoc_available())
+  pd <- suppressMessages(prepare_input(
+    salmonella_strains, col_select = c("CONTEXTE", "REGION", "SECTEUR"),
+    id = "IDENTIFIANT"
+  ))
+  for (n_max in c(5, 40)) {
+    res <- select_strains(pd, n_max = n_max, method = "profile", seed = 1)
+    file <- file.path(tempdir(), paste0("report_profile_", n_max, ".html"))
+    suppressMessages(report_selection(res, file = file, data = salmonella_strains,
+                                      id = "IDENTIFIANT"))
+    html <- gsub("\\s+", " ", paste(readLines(file, warn = FALSE), collapse = " "))
+    expect_match(html, "profile method")
+    expect_match(html, "Groups of identical strains")
+    expect_match(html, res$selected[1])
+  }
+})

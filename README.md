@@ -91,6 +91,19 @@ res
 #>   optimal groups not represented: 41 out of 61
 ```
 
+The same with the profile method (one strain per group of identical
+strains, largest groups first):
+
+``` r
+select_strains(prepared_data, n_max = 20, method = "profile", seed = 1)
+#> Strain selection (profile method)
+#>   strains: 100 - distinct profiles: 61 
+#>   groups of identical strains: 61 
+#>   maximum number of strains (n_max): 20 
+#>   selected strains: 20 (selected: 20) 
+#>   groups not represented: 41 out of 61
+```
+
 Export the original metadata with the selection, and write an HTML
 report:
 

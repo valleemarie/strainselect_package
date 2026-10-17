@@ -12,6 +12,7 @@ test_that("select_strains selects the optimal number of strains by default", {
   pd <- prepared_test()
   res <- select_strains(pd, seed = 1)
   expect_s3_class(res, "strainselect_selection")
+  expect_equal(res$method, "clustering")
   expect_equal(res$k_opt, res$silhouette$k[which.max(res$silhouette$avg_silwidth)])
   expect_equal(length(res$selected), res$k_opt)
   expect_true(all(res$table$status[res$table$selected] == "optimal"))
@@ -61,4 +62,60 @@ test_that("select_strains checks its arguments and is reproducible", {
   expect_message(res <- select_strains(pd, n_max = 500), "all 100 strains")
   expect_equal(length(res$selected), 100)
   expect_error(select_strains(pd[1:2, ]), "at least 3 strains")
+  expect_error(select_strains(pd, method = "other"))
+})
+
+test_that("profile method: one strain per distinct profile by default", {
+  pd <- prepared_test()
+  res <- select_strains(pd, method = "profile", seed = 1)
+  n_profiles <- nrow(unique(pd))
+  expect_equal(res$method, "profile")
+  expect_equal(res$k_opt, n_profiles)
+  expect_equal(length(res$selected), n_profiles)
+  expect_true(all(res$table$status[res$table$selected] == "optimal"))
+  expect_true(all(res$groups$n_selected == 1))
+  # groups are numbered by decreasing size
+  expect_false(is.unsorted(rev(res$groups$size)))
+  expect_equal(res$groups$size, as.vector(table(res$table$cluster)))
+  # strains of a group have the same profile
+  profiles <- do.call(paste, lapply(pd, as.character))
+  expect_true(all(tapply(profiles, res$table$cluster, function(p) length(unique(p))) == 1))
+  expect_output(print(res), "profile method")
+  expect_s3_class(plot(res), "ggplot")
+})
+
+test_that("profile method: largest groups first when n_max is smaller", {
+  pd <- prepared_test()
+  res <- select_strains(pd, n_max = 20, method = "profile", seed = 1)
+  expect_equal(length(res$selected), 20)
+  expect_true(all(res$table$status[res$table$selected] == "selected"))
+  expect_equal(res$groups$n_selected, rep(c(1, 0), c(20, res$k_opt - 20)))
+  expect_equal(res$unrepresented_groups, 21:res$k_opt)
+  # the selected groups are at least as large as the others
+  expect_gte(min(res$groups$size[1:20]), max(res$groups$size[-(1:20)]))
+  expect_true(all(is.na(res$table$representative[!res$table$group_represented])))
+  expect_output(print(res), "groups not represented")
+})
+
+test_that("profile method: supplementary strains turn by turn", {
+  pd <- prepared_test()
+  res <- select_strains(pd, n_max = 75, method = "profile", seed = 1)
+  n_groups <- res$k_opt
+  extra <- 75 - n_groups
+  expect_equal(length(res$selected), 75)
+  expect_equal(sum(res$table$status == "optimal"), n_groups)
+  expect_equal(sum(res$table$status == "supplementary"), extra)
+  # second turn: one more strain in the largest groups that have one
+  can_have_2 <- which(res$groups$size >= 2)
+  expected <- pmin(res$groups$size, 1)
+  expected[can_have_2[seq_len(min(extra, length(can_have_2)))]] <- 2
+  if (extra <= length(can_have_2)) {
+    expect_equal(res$groups$n_selected, expected)
+  }
+  # all strains when n_max = number of strains; fill = FALSE stops at the profiles
+  expect_equal(length(select_strains(pd, n_max = 100, method = "profile")$selected), 100)
+  expect_equal(length(select_strains(pd, n_max = 75, method = "profile",
+                                     fill = FALSE)$selected), n_groups)
+  expect_identical(select_strains(pd, n_max = 30, method = "profile", seed = 2)$selected,
+                   select_strains(pd, n_max = 30, method = "profile", seed = 2)$selected)
 })

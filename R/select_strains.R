@@ -2,56 +2,81 @@
 
 #' Select strains to sequence, with or without a maximum number of strains
 #'
-#' Runs the clustering method in one step: computes the Gower distances and
-#' the hierarchical clustering tree, finds the optimal number of clusters
-#' (largest average silhouette width) and selects the strains to sequence,
-#' taking into account the maximum number of strains that can be sequenced.
+#' Selects the strains to sequence with the clustering method or with the
+#' profile method, taking into account the maximum number of strains that
+#' can be sequenced.
+#'
+#' **Clustering method** (`method = "clustering"`, default): computes the
+#' Gower distances and the hierarchical clustering tree, finds the optimal
+#' number of clusters (largest average silhouette width) and selects in each
+#' cluster the strain with the largest silhouette width.
+#'
+#' **Profile method** (`method = "profile"`): groups the strains with
+#' identical metadata (distinct profiles) and sorts the groups by decreasing
+#' size (ties in random order). One strain per group gives the "optimal"
+#' selection. With a smaller `n_max`, one strain is selected in each of the
+#' `n_max` largest groups. With a larger `n_max`, supplementary strains are
+#' added turn by turn: a second strain in each group that has one, from the
+#' largest group to the smallest, then a third strain, and so on. Strains of
+#' a group have the same metadata, so the strain(s) of a group are chosen at
+#' random.
 #'
 #' @param prepared_data A data frame with one row per strain, as returned by
 #'   [prepare_input()].
 #' @param n_max Maximum number of strains that can be sequenced, or `NULL`
-#'   (default) to select the optimal number of strains.
+#'   (default) to select the optimal number of strains (one per optimal
+#'   cluster or one per distinct profile).
+#' @param method `"clustering"` (default) or `"profile"`.
 #' @param fill If `TRUE` (default) and `n_max` is larger than the optimal
-#'   number of clusters, the selection is completed up to `n_max` strains
+#'   number of strains, the selection is completed up to `n_max` strains
 #'   with supplementary strains. If `FALSE`, the selection stops at the
 #'   optimum.
-#' @param weights Numeric vector of weights, one per column of
-#'   `prepared_data` (see [assess_gower()]), or `NULL` for equal weights.
-#' @param k_max Largest number of clusters tested to find the optimum. By
-#'   default, the number of distinct profiles (beyond it, clusters only split
-#'   identical strains), limited to the number of strains minus 1. Lower it
-#'   to save time on large datasets.
-#' @param seed An integer passed to [set.seed()] to make the choice between
-#'   ex aequo strains reproducible, or `NULL` (default).
+#' @param weights Clustering method only: numeric vector of weights, one per
+#'   column of `prepared_data` (see [assess_gower()]), or `NULL` for equal
+#'   weights.
+#' @param k_max Clustering method only: largest number of clusters tested to
+#'   find the optimum. By default, the number of distinct profiles (beyond
+#'   it, clusters only split identical strains), limited to the number of
+#'   strains minus 1. Lower it to save time on large datasets.
+#' @param seed An integer passed to [set.seed()] to make the random choices
+#'   reproducible (ex aequo strains or groups), or `NULL` (default).
 #'
 #' @return An object of class `strainselect_selection`, a list with:
 #'   \describe{
 #'     \item{table}{`prepared_data` with the columns `cluster` (cluster in
-#'       the final cut of the tree), `optimal_group` (cluster at the optimal
-#'       number of clusters), `selected` (`TRUE`/`FALSE`), `status`
-#'       (`"optimal"`, `"supplementary"`, `"selected"` or `"not selected"`),
-#'       `representative` (identifier of the strain selected in the same
-#'       cluster) and `group_represented` (whether the optimal group of the
-#'       strain contains a selected strain);}
+#'       the final cut of the tree, or group of identical strains numbered by
+#'       decreasing size for the profile method), `optimal_group` (cluster at
+#'       the optimal number of clusters, or group of identical strains),
+#'       `selected` (`TRUE`/`FALSE`), `status` (`"optimal"`,
+#'       `"supplementary"`, `"selected"` or `"not selected"`),
+#'       `representative` (identifier of the selected strain of the same
+#'       cluster or group, `NA` if none) and `group_represented` (whether the
+#'       optimal group of the strain contains a selected strain);}
 #'     \item{selected}{identifiers of the selected strains;}
-#'     \item{k_opt}{optimal number of clusters;}
-#'     \item{k}{number of clusters of the final cut, i.e. number of selected
-#'       strains;}
+#'     \item{method}{the method used;}
+#'     \item{k_opt}{optimal number of strains: optimal number of clusters, or
+#'       number of distinct profiles for the profile method;}
+#'     \item{k}{number of selected strains;}
 #'     \item{n_max, fill}{the arguments used;}
-#'     \item{silhouette}{data frame of the average silhouette width (`avg_silwidth`)
-#'       for each number of clusters `k` tested;}
-#'     \item{unrepresented_groups}{optimal groups without any selected strain
-#'       (only when `n_max` is smaller than the optimum);}
+#'     \item{silhouette}{clustering method: data frame of the average
+#'       silhouette width (`avg_silwidth`) for each number of clusters `k`
+#'       tested;}
+#'     \item{groups}{profile method: data frame with, for each group of
+#'       identical strains, its `size`, its number of selected strains
+#'       (`n_selected`) and its `profile`;}
+#'     \item{unrepresented_groups}{optimal groups without any selected
+#'       strain (only when `n_max` is smaller than the optimum);}
 #'     \item{n_strains, n_profiles}{number of strains and of distinct
 #'       profiles;}
-#'     \item{weights}{the weights of the metadata;}
-#'     \item{gower}{the output of [assess_gower()].}
+#'     \item{weights}{the weights of the metadata (clustering method);}
+#'     \item{gower}{the output of [assess_gower()] (clustering method).}
 #'   }
 #'   The object has `print()` and `plot()` methods, and can be exported with
 #'   [export_selection()] or summarised in a report with
 #'   [report_selection()].
 #' @export
 #' @family clustering method
+#' @family profile method
 #' @importFrom cluster silhouette
 #' @importFrom stats cutree
 #'
@@ -61,7 +86,7 @@
 #'   col_select = c("CONTEXTE", "MATRICE1", "REGION", "SECTEUR", "LIEUPVT"),
 #'   id = "IDENTIFIANT", date = "DATE_PRELEVEMENT"
 #' )
-#' # no budget: optimal number of strains
+#' # clustering method, no budget: optimal number of strains
 #' res <- select_strains(prepared_data, seed = 1)
 #' res
 #' plot(res)
@@ -69,8 +94,15 @@
 #' res_20 <- select_strains(prepared_data, n_max = 20, seed = 1)
 #' res_20
 #' head(res_20$table[, c("cluster", "optimal_group", "selected", "status")])
-select_strains <- function(prepared_data, n_max = NULL, fill = TRUE,
+#' # profile method, budget larger than the number of distinct profiles
+#' res_profile <- select_strains(prepared_data, n_max = 75, method = "profile", seed = 1)
+#' res_profile
+#' plot(res_profile)
+#' head(res_profile$groups)
+select_strains <- function(prepared_data, n_max = NULL,
+                           method = c("clustering", "profile"), fill = TRUE,
                            weights = NULL, k_max = NULL, seed = NULL) {
+  method <- match.arg(method)
   n <- nrow(prepared_data)
   n_profiles <- nrow(unique(prepared_data))
   if (n < 3 || n_profiles < 2) {
@@ -87,11 +119,14 @@ select_strains <- function(prepared_data, n_max = NULL, fill = TRUE,
       n_max <- n
     }
   }
-  if (is.null(weights)) {
-    weights <- rep.int(1, ncol(prepared_data))
-  }
   if (!is.null(seed)) {
     set.seed(seed)
+  }
+  if (method == "profile") {
+    return(select_by_profile(prepared_data, n_max, fill, n_profiles))
+  }
+  if (is.null(weights)) {
+    weights <- rep.int(1, ncol(prepared_data))
   }
   gower <- assess_gower(prepared_data, weights = weights, graph = FALSE)
   dist <- gower$gower_dist
@@ -148,16 +183,108 @@ select_strains <- function(prepared_data, n_max = NULL, fill = TRUE,
     list(
       table = table,
       selected = selected,
+      method = "clustering",
       k_opt = k_opt,
       k = k,
       n_max = n_max,
       fill = fill,
       silhouette = data.frame(k = ks, avg_silwidth = avg_silwidth),
+      groups = NULL,
       unrepresented_groups = setdiff(seq_len(k_opt), represented_groups),
       n_strains = n,
       n_profiles = n_profiles,
       weights = weights,
       gower = gower
+    ),
+    class = "strainselect_selection"
+  )
+}
+
+#' Selection with the profile method
+#'
+#' @param prepared_data,n_max,fill See [select_strains()].
+#' @param n_profiles Number of distinct profiles.
+#'
+#' @return An object of class `strainselect_selection`.
+#' @noRd
+select_by_profile <- function(prepared_data, n_max, fill, n_profiles) {
+  ids <- rownames(prepared_data)
+  profile <- do.call(paste, c(lapply(prepared_data, as.character), sep = " | "))
+  sizes <- table(profile)
+  # groups numbered by decreasing size, ties in random order
+  ord <- order(-as.vector(sizes), sample.int(length(sizes)))
+  group_number <- stats::setNames(seq_along(ord), names(sizes)[ord])
+  group <- unname(group_number[profile])
+  n_groups <- length(sizes)
+  # strains of a group in random order: the first one is chosen first
+  members <- split(ids, factor(group, levels = seq_len(n_groups)))
+  members <- lapply(members, function(m) m[sample.int(length(m))])
+
+  if (is.null(n_max)) {
+    k <- n_groups
+  } else if (n_max >= n_groups) {
+    k <- if (fill) n_max else n_groups
+  } else {
+    k <- n_max
+  }
+  first <- vapply(members, `[`, character(1), 1)
+  if (k < n_groups) {
+    selected <- unname(first[seq_len(k)])
+    status <- ifelse(ids %in% selected, "selected", "not selected")
+  } else {
+    # one strain per group, then turn by turn from the largest group
+    supplementary <- character(0)
+    turn <- 2
+    while (n_groups + length(supplementary) < k) {
+      for (g in seq_len(n_groups)) {
+        if (length(members[[g]]) >= turn && n_groups + length(supplementary) < k) {
+          supplementary <- c(supplementary, members[[g]][turn])
+        }
+      }
+      turn <- turn + 1
+    }
+    selected <- c(unname(first), supplementary)
+    status <- ifelse(ids %in% first, "optimal",
+                     ifelse(ids %in% supplementary, "supplementary",
+                            "not selected"))
+  }
+  is_selected <- ids %in% selected
+  represented_groups <- unique(group[is_selected])
+  representative <- ifelse(group %in% represented_groups,
+                           unname(first[group]), NA_character_)
+
+  table <- prepared_data
+  table$cluster <- group
+  table$optimal_group <- group
+  table$selected <- is_selected
+  table$status <- status
+  table$representative <- representative
+  table$group_represented <- group %in% represented_groups
+
+  groups <- data.frame(
+    group = seq_len(n_groups),
+    size = as.vector(sizes)[ord],
+    n_selected = as.vector(table(factor(group[is_selected],
+                                        levels = seq_len(n_groups)))),
+    profile = names(sizes)[ord]
+  )
+
+  structure(
+    list(
+      table = table,
+      selected = selected,
+      method = "profile",
+      k_opt = n_groups,
+      k = length(selected),
+      n_max = n_max,
+      fill = fill,
+      silhouette = NULL,
+      groups = groups,
+      unrepresented_groups = setdiff(seq_len(n_groups), represented_groups),
+      n_strains = nrow(prepared_data),
+      n_profiles = n_profiles,
+      weights = NULL,
+      gower = NULL
     ),
     class = "strainselect_selection"
   )
@@ -191,9 +318,15 @@ best_strains <- function(tree, dist, k) {
 
 #' @export
 print.strainselect_selection <- function(x, ...) {
-  cat("Strain selection (clustering method)\n")
+  profile <- identical(x$method, "profile")
+  cat("Strain selection (", if (profile) "profile" else "clustering",
+      " method)\n", sep = "")
   cat("  strains:", x$n_strains, "- distinct profiles:", x$n_profiles, "\n")
-  cat("  optimal number of clusters (k_opt):", x$k_opt, "\n")
+  if (profile) {
+    cat("  groups of identical strains:", x$k_opt, "\n")
+  } else {
+    cat("  optimal number of clusters (k_opt):", x$k_opt, "\n")
+  }
   if (is.null(x$n_max)) {
     cat("  maximum number of strains (n_max): not given\n")
   } else {
@@ -210,15 +343,32 @@ print.strainselect_selection <- function(x, ...) {
         "strains of the budget are not used (fill = FALSE)\n")
   }
   if (length(x$unrepresented_groups) > 0) {
-    cat("  optimal groups not represented:", length(x$unrepresented_groups),
-        "out of", x$k_opt, "\n")
+    cat(if (profile) "  groups not represented:" else "  optimal groups not represented:",
+        length(x$unrepresented_groups), "out of", x$k_opt, "\n")
   }
   invisible(x)
 }
 
 #' @export
-#' @importFrom ggplot2 ggplot aes .data geom_point geom_line geom_vline annotate labs
+#' @importFrom ggplot2 ggplot aes .data geom_point geom_line geom_vline geom_col annotate labs
 plot.strainselect_selection <- function(x, ...) {
+  if (identical(x$method, "profile")) {
+    p <- ggplot(x$groups, aes(x = .data$group)) +
+      geom_col(aes(y = .data$size), fill = "grey80") +
+      geom_col(aes(y = .data$n_selected), fill = "steelblue") +
+      labs(x = "Group of identical strains (by decreasing size)",
+           y = "Number of strains",
+           title = "Selected strains (blue) in each group (grey)")
+    if (!is.null(x$n_max) && x$n_max < x$k_opt) {
+      p <- p +
+        geom_vline(xintercept = x$n_max + 0.5, linetype = "dotted",
+                   colour = "firebrick") +
+        annotate("text", x = x$n_max + 0.5, y = max(x$groups$size),
+                 label = paste("n_max =", x$n_max), colour = "firebrick",
+                 hjust = -0.1, vjust = 1)
+    }
+    return(p)
+  }
   p <- ggplot(x$silhouette, aes(x = .data$k, y = .data$avg_silwidth)) +
     geom_line() +
     geom_point() +
