@@ -573,9 +573,10 @@ upset_data[1:5, 1:4]
 The binary table can be used to visualise the groups of identical strains in
 an UpSet plot, for instance with the {UpSetR} package:
 
-```{r upset-plot, eval = requireNamespace("UpSetR", quietly = TRUE), fig.width = 7, fig.height = 5}
-UpSetR::upset(upset_data, nsets = ncol(upset_data), order.by = "freq",
-              mb.ratio = c(0.3, 0.7), nintersects = 30)
+```{r upset-plot, eval = requireNamespace("UpSetR", quietly = TRUE), fig.width = 9, fig.height = 5}
+# the 12 most frequent modalities
+UpSetR::upset(upset_data, nsets = 12, order.by = "freq", nintersects = 20,
+              mb.ratio = c(0.55, 0.45), text.scale = 1.1)
 ```
 
 ```{r tests-prepare_upset}

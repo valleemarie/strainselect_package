@@ -1,27 +1,43 @@
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
 # strainselect
 
 <!-- badges: start -->
+
 [![R-CMD-check](https://github.com/lguillier/strainselect_package/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/lguillier/strainselect_package/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 {strainselect} helps choosing which bacterial strains to sequence from a
-collection described by metadata (sampling context, matrix, region, sector,
-year...). It provides two methods.
+collection described by metadata (sampling context, matrix, region,
+sector, year…). It provides two methods:
 
-The first, based on **clustering**, can be used if you have a limited number
-of strains to sequence. It allows you to choose the optimal number of clusters
-or to fix the number of clusters you can sequence. Clusters are defined thanks
-to a dissimilarity matrix obtained by calculating the Gower distance between
-each strain. Then, for each cluster, the best clustered strain is selected.
-This method allows the selection of strains that differ in their
-characteristics.
+- the **clustering method**, when the number of strains that can be
+  sequenced is limited: strains are grouped into *k* clusters using the
+  Gower distance and hierarchical clustering, and the best clustered
+  strain of each cluster is selected, so that the selected strains are
+  as different as possible;
+- the **profile method**, when the number of strains to sequence is not
+  limited: strains sharing exactly the same metadata are grouped, and
+  one strain per group is selected, so that every distinct profile —
+  including unique strains — is represented.
 
-The second method, based on **profiles** (interactions), can be used if
-you're not limited by the number of strains to sequence. It groups the strains
-that are completely similar, while identifying unique strains that are not
-similar to any other, and selects one strain per group.
+<figure>
+<img
+src="https://user-images.githubusercontent.com/114993027/220967873-c8a4edaa-2d93-441c-b88e-7ec0a9bb674b.png"
+alt="image" />
+<figcaption aria-hidden="true">image</figcaption>
+</figure>
 
-![image](https://user-images.githubusercontent.com/114993027/220967873-c8a4edaa-2d93-441c-b88e-7ec0a9bb674b.png)
+## Documentation
+
+📖 **Website: <https://lguillier.github.io/strainselect_package/>**
+
+- [Get
+  started](https://lguillier.github.io/strainselect_package/articles/get-started.html):
+  both methods step by step;
+- [Reference](https://lguillier.github.io/strainselect_package/reference/index.html):
+  help pages of all functions.
 
 ## Installation
 
@@ -32,37 +48,95 @@ Install the development version from GitHub:
 remotes::install_github("lguillier/strainselect_package", build_vignettes = TRUE)
 ```
 
-## Usage
+## Example
+
+The package ships with an example table of 100 *Salmonella* strains
+described by 24 variables. We base the selection on 6 of them and on the
+year of sampling.
 
 ``` r
 library(strainselect)
 
-# Example data: 100 Salmonella strains described by 24 variables
 datafile <- system.file("data_test.csv", package = "strainselect")
 raw_data <- read.csv(datafile, sep = ";")
 
-# Keep the metadata used for the selection and extract the year of sampling
 prepared_data <- prepare_input(raw_data, col_select = c(7, 10, 13, 14, 17, 24),
                                id = 1, date = 17, year = TRUE)
-
-# Clustering method: select 20 strains as different as possible
-gower <- assess_gower(prepared_data, graph = FALSE)
-stats <- cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 50, step = 10)
-selection <- select_silhouette(prepared_data, gower$gower_dist, k = 20, seed = 1)
-unique(selection$selected)
-
-# Profile method: select one strain per distinct profile
-profiles <- define_profiles(prepare_upset(prepared_data))
-selection <- select_profiles(profiles, prepared_data, seed = 1)
-unique(selection$selected)
+#> no duplicate ID
+#> selected metadata: CONTEXTE, MATRICE1, REGION, SECTEUR, LIEUPVT, ANNEE
+head(prepared_data, 3)
+#>                   CONTEXTE         MATRICE1               REGION
+#> 2020LSAL00151 Surveillance     non spécifié Auvergne Rhone Alpes
+#> 2020LSAL00152 Surveillance     non spécifié Auvergne Rhone Alpes
+#> 2020LSAL00163 Surveillance Viande de canard   Nouvelle Aquitaine
+#>                            SECTEUR                     LIEUPVT ANNEE
+#> 2020LSAL00151          Eco-système     Source/captage de l'eau  2020
+#> 2020LSAL00152          Eco-système     Source/captage de l'eau  2020
+#> 2020LSAL00163 Alimentation humaine Transformation industrielle  2020
 ```
 
-See the "Get started" vignette (`vignette("get-started", package =
-"strainselect")`) for a step-by-step description of both methods.
+### Clustering method: a fixed number of strains
 
-## Funding
+The average silhouette width helps choosing the number of clusters: look
+for a maximum or a plateau.
 
-This work was supported by funding from the European Union’s Horizon 2020
-Research and Innovation programme under grant agreement No 773830: One Health
-European Joint Programme (project CARE: Cross-sectoral framework for quality
-Assurance Resources for countries in the European Union)
+``` r
+gower <- assess_gower(prepared_data, graph = FALSE)
+stats <- cstats_table(gower$gower_dist, gower$aggl.clust.c, k = 50, step = 5)
+```
+
+<img src="man/figures/README-silhouette-1.png" width="100%" />
+
+Then select one strain per cluster, here 20 strains:
+
+``` r
+selection <- select_silhouette(prepared_data, gower$gower_dist, k = 20, seed = 1)
+head(selection[, c("cluster", "size", "selected")])
+#>               cluster size      selected
+#> 2020LSAL00151       1    4 2020LSAL00802
+#> 2020LSAL00152       1    4 2020LSAL00802
+#> 2020LSAL00163       2   25 2020LSAL00487
+#> 2020LSAL00167       2   25 2020LSAL00487
+#> 2020LSAL00176       3   11 2020LSAL00177
+#> 2020LSAL00177       3   11 2020LSAL00177
+unique(selection$selected)
+#>  [1] "2020LSAL00802" "2020LSAL00487" "2020LSAL00177" "2020LSAL00854"
+#>  [5] "2020LSAL00454" "2020LSAL00720" "2020LSAL00506" "2020LSAL00550"
+#>  [9] "2020LSAL00660" "2020LSAL00668" "2020LSAL00724" "2020LSAL00790"
+#> [13] "2020LSAL00912" "2020LSAL00792" "2020LSAL00866" "2020LSAL00892"
+#> [17] "2020LSAL01016" "2020LSAL00994" "2020LSAL01040" "2020LSAL01188"
+```
+
+### Profile method: one strain per distinct profile
+
+The binary table of modalities can be explored with an UpSet plot (here
+the 12 most frequent modalities):
+
+``` r
+upset_data <- prepare_upset(prepared_data)
+UpSetR::upset(upset_data, nsets = 12, order.by = "freq", nintersects = 20,
+              mb.ratio = c(0.55, 0.45), text.scale = 1.1)
+```
+
+<img src="man/figures/README-upset-1.png" width="100%" />
+
+``` r
+profiles <- define_profiles(upset_data)
+selection <- select_profiles(profiles, prepared_data, seed = 1)
+length(unique(selection$selected))   # number of strains to sequence
+#> [1] 61
+```
+
+## Acknowledgements
+
+`cstats_table()` and the Gower distance / hierarchical clustering
+workflow are adapted from Anastasia Reusova’s tutorial [*Hierarchical
+Clustering on Categorical Data in
+R*](https://medium.com/@anastasia.reusova/hierarchical-clustering-on-categorical-data-in-r-a27e578f2995)
+([code](https://github.com/khunreus/cluster-categorical)).
+
+This work was supported by funding from the European Union’s Horizon
+2020 Research and Innovation programme under grant agreement No 773830:
+One Health European Joint Programme (project CARE: Cross-sectoral
+framework for quality Assurance Resources for countries in the European
+Union).
